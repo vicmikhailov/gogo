@@ -1,0 +1,58 @@
+# Binaries and executable files
+gogo
+gogo_binary
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+bin/
+dist/
+
+# Go-specific patterns
+vendor/
+coverage.out
+profile.out
+debug
+debug.test
+
+# IDE and Editors
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# VS Code
+.vscode/
+
+# Other editors
+*~
+*.swp
+*.swo
+.DS_Store
+
+# macOS-specific
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows-specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Log and temporary files
+*.log
+output.log
+test_demo.txt
+tmp/
+temp/
+.env
+*.env.*

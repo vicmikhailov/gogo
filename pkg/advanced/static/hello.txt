@@ -1,0 +1,2 @@
+This is a secret message embedded in the Go binary!
+It's part of the static assets demonstration.
