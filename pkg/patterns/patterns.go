@@ -4,6 +4,10 @@
 //   - Go doesn't have classes, but it implements GoF patterns using structs,
 //     interfaces, and functional features.
 //   - Composition is preferred over inheritance (which doesn't exist).
+//   - Java-ism to avoid: Over-engineering with too many design patterns.
+//     Go prefers simple, direct code. Only use patterns when they actually
+//     solve a concrete problem (like `sync.Once` for singletons or functional options
+//     for complex configuration).
 package patterns
 
 import (

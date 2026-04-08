@@ -1,9 +1,9 @@
 // Package generics showcases Go's generic capabilities. // Package comment describing purpose.
-package generics // Declaring the package name as generics.
+package generics
 
-import ( // Starting the import block for this package.
-	"fmt" // Importing fmt for formatted console output.
-) // Closing the import block.
+import (
+	"fmt"
+)
 
 // List is a generic slice wrapper. // Comment describing the List type.
 //
@@ -15,13 +15,13 @@ import ( // Starting the import block for this package.
 //   - Methods on generic types must also declare the type parameters. // Note about method declarations on generic types.
 type List[T any] struct { // Declaring a generic struct List with type parameter T.
 	items []T // Underlying slice storing items of type T.
-} // Closing the List struct definition.
+}
 
 // Add appends an item to the list. // Comment for the Add method.
 // In Go, we use a pointer receiver `(l *List[T])` to modify the struct's internal state. // Explaining pointer receiver necessity.
 func (l *List[T]) Add(item T) { // Method Add with pointer receiver to mutate List.
 	l.items = append(l.items, item) // `append` is a built-in function that handles slice resizing and copying as needed.
-} // End of Add method.
+}
 
 // Get returns the item at the specified index and a boolean indicating success. // Comment for the Get method.
 // Java equivalent: `public Optional<T> get(int index)` // Comparing to Java Optional.
@@ -30,12 +30,10 @@ func (l *List[T]) Get(index int) (T, bool) { // Method Get returning value and p
 	if index < 0 || index >= len(l.items) { // Bounds check to prevent panic on out-of-range.
 		var zero T         // Returns the "zero value" for type T (e.g., 0 for int, "" for string, nil for pointers)
 		return zero, false // Indicating failure to get a value at the index.
-	} // End of bounds check.
-	return l.items[index], true // Returning the element and true to indicate success.
-} // End of Get method.
+	}
+	return l.items[index], true
+}
 
-// MapValues applies a function to each element of a slice and returns a new slice. // Comment for the MapValues generic function.
-//
 // For a Java developer: // Guidance for Java background readers.
 // - This is like `list.stream().map(f).collect(Collectors.toList())`. // Comparing to Java Stream map.
 // - Go doesn't have a built-in Stream API, so we often write these helper functions. // Explaining helper usage.
@@ -43,12 +41,10 @@ func MapValues[T any, R any](items []T, f func(T) R) []R { // Generic MapValues 
 	result := make([]R, len(items)) // Pre-allocating result with the same length as input for efficiency.
 	for i, v := range items {       // Iterating over items with index and value.
 		result[i] = f(v) // Applying the mapping function to each element and storing it at the same index.
-	} // End of iteration loop.
-	return result // Returning the mapped slice.
-} // End of MapValues.
+	}
+	return result
+}
 
-// RunGenericsDemo showcases Go's generic capabilities. // Comment for the demo runner function.
-//
 // For a Java developer: // Guidance for Java background readers.
 // - Demonstrates using generic types and functions with different concrete types. // Explaining demo purpose.
 // - Note how Go infers the type parameters in function calls like `MapValues(ints, ...)`. // Noting type inference in calls.
@@ -76,14 +72,14 @@ func RunGenericsDemo() { // Demo function printing examples to stdout.
 	fmt.Println("2. Generic function MapValues:") // Printing subsection title.
 	ints := []int{1, 2, 3, 4, 5}                  // Defining a slice of integers.
 	doubled := MapValues(ints, func(i int) int {  // Mapping each int to double its value.
-		return i * 2 // Returning doubled value.
-	}) // End of mapping closure.
+		return i * 2
+	})
 	fmt.Printf("   Doubled: %v\n", doubled) // Printing the doubled slice.
 
 	lengths := MapValues([]string{"Go", "Generics", "Showcase"}, func(s string) int { // Mapping strings to their lengths.
-		return len(s) // Returning length of string.
-	}) // End of mapping closure.
+		return len(s)
+	})
 	fmt.Printf("   Word lengths: %v\n", lengths) // Printing resulting lengths.
 
 	fmt.Println("--- Generics Demo End ---") // Printing section footer.
-} // End of RunGenericsDemo.
+}

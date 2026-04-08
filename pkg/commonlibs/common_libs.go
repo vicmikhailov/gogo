@@ -4,20 +4,20 @@
 // - uuid: Equivalent to java.util.UUID. // Explaining uuid analogy.
 // - gin: Equivalent to Spring Boot (Web) or JAX-RS. The most popular web framework in Go. // Explaining gin analogy.
 // - testify: Equivalent to JUnit assertions (AssertJ/Hamcrest) and Mockito. // Explaining testify analogy.
-package commonlibs // Declaring the package name as commonlibs.
+package commonlibs
 
-import ( // Starting the import block for third-party demos.
-	"context"  // Importing context for cancellation and deadlines.
-	"fmt"      // Importing fmt for console output.
-	"net/http" // Importing net/http for HTTP status codes used by gin.
-	"time"     // Importing time for timing and delays.
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"time"
 
-	"github.com/gin-gonic/gin"         // Importing the Gin web framework.
-	"github.com/google/uuid"           // Importing UUID library for generating unique identifiers.
-	"github.com/stretchr/testify/mock" // Importing testify's mock package for mocking.
-	"go.uber.org/zap"                  // Importing zap for structured logging.
-	"golang.org/x/sync/errgroup"       // Importing errgroup for structured concurrency.
-) // Closing the import block.
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/mock"
+	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
+)
 
 // RunCommonLibsDemo demonstrates how to use popular Go libraries. // Comment for the demo orchestrator.
 func RunCommonLibsDemo() { // Entry point for the common libraries showcase.
@@ -45,10 +45,8 @@ func RunCommonLibsDemo() { // Entry point for the common libraries showcase.
 	runErrgroupDemo() // Executing the errgroup concurrency demo.
 
 	fmt.Println("--- Common Libraries Demo End ---") // Printing the section footer.
-} // End of RunCommonLibsDemo.
+}
 
-// runZapDemo demonstrates high-performance, structured logging using the Uber-zap library. // Comment for the zap demo function.
-//
 // For a Java developer: // Guidance for Java background readers.
 // - Similar to SLF4J + Logback, but designed for zero-allocations in hot paths. // Explaining performance focus.
 // - Structured logging (JSON) is first-class, making it easier to parse logs in ELK/Splunk. // Explaining structured logging benefits.
@@ -74,10 +72,8 @@ func runZapDemo() { // Function to showcase zap logging.
 	sugar.Infof("Hello from zap sugar logger!") // Logging using formatted string.
 
 	fmt.Println("   Check the console output above (it's JSON in production mode!)") // Noting JSON output in production mode.
-} // End of runZapDemo.
+}
 
-// runUUIDDemo demonstrates generating and parsing UUIDs. // Comment for the UUID demo function.
-//
 // For a Java developer: // Guidance for Java background readers.
 // - Java equivalent: `java.util.UUID`. // Comparing to Java UUID API.
 func runUUIDDemo() { // Function to showcase UUID generation and parsing.
@@ -91,11 +87,9 @@ func runUUIDDemo() { // Function to showcase UUID generation and parsing.
 	parsed, err := uuid.Parse(id.String()) // Parsing the UUID string back to a UUID object.
 	if err == nil {                        // Checking if parsing succeeded.
 		fmt.Printf("   Parsed UUID back successfully: %v\n", parsed.Version()) // Printing the UUID version.
-	} // End of parsing check.
-} // End of runUUIDDemo.
+	}
+}
 
-// runGinDemo demonstrates the Gin web framework with custom middleware. // Comment for the Gin demo function.
-//
 // For a Java developer: // Guidance for Java background readers.
 // - Gin is the most popular Go web framework, similar to Spring Boot or Micronaut but much lighter. // Comparing to Java frameworks.
 // - Middleware is equivalent to Servlet Filters or Spring Interceptors. // Explaining middleware analogy.
@@ -110,12 +104,12 @@ func runGinDemo() { // Function to showcase Gin setup and middleware.
 
 	// Middleware in Gin is like Spring Interceptors or Servlet Filters. // Explaining where middleware fits.
 	// This custom middleware logs the request and handles any panic. // Describing middleware behavior.
-	r.Use(func(c *gin.Context) { // Registering a custom middleware function.
+	r.Use(func(c *gin.Context) {
 		t := time.Now()                                                                           // Recording start time.
 		c.Next()                                                                                  // Processing the request (next handler in the chain).
 		latency := time.Since(t)                                                                  // Computing latency after request is processed.
 		fmt.Printf("   [Custom Middleware] Request to %s took %v\n", c.Request.URL.Path, latency) // Logging route and latency.
-	}) // End of custom middleware.
+	})
 	r.Use(gin.Recovery()) // Adding Gin's built-in recovery middleware to handle panics gracefully.
 
 	// Defining a route is very explicit (no annotations) // Comment about explicit routing.
@@ -125,12 +119,12 @@ func runGinDemo() { // Function to showcase Gin setup and middleware.
 			"message": "pong",    // A simple message field.
 			"library": "gin",     // Indicating the library.
 			"status":  "awesome", // Including a status field.
-		}) // End of JSON response.
-	}) // End of route handler.
+		})
+	})
 
 	fmt.Println("   Gin engine initialized with route: GET /api/ping") // Indicating route initialization.
 	fmt.Println("   (In a real app, you would call r.Run(':8081'))")   // Clarifying we aren't starting the server here.
-} // End of runGinDemo.
+}
 
 // 4. Mocking with testify/mock // Section header for mocking demo.
 // Java comparison: Using @Mock and when(mock.method()).thenReturn(value) in Mockito. // Explaining Java analogy.
@@ -138,21 +132,18 @@ func runGinDemo() { // Function to showcase Gin setup and middleware.
 // Database defines a simple interface for mocking demonstration. // Comment for the Database interface.
 type Database interface { // Interface representing a database dependency.
 	GetUser(id string) string // Method to fetch a user by ID.
-} // End of Database interface.
+}
 
-// mockDB is a mock implementation of the Database interface. // Comment for the mockDB struct.
 type mockDB struct { // Struct embedding testify's Mock type.
 	mock.Mock // Embedding Mock provides methods like On, Called, AssertExpectations.
-} // End of mockDB struct.
+}
 
 // GetUser is a mocked method. // Comment for the mocked method implementation.
 func (m *mockDB) GetUser(id string) string { // Method satisfying Database interface using testify.Mock.
-	args := m.Called(id)  // Recording the call and retrieving configured return arguments.
-	return args.String(0) // Returning the first argument as string (configured via On().Return()).
-} // End of GetUser.
+	args := m.Called(id) // Recording the call and retrieving configured return arguments.
+	return args.String(0)
+}
 
-// runMockDemo demonstrates mocking with the testify/mock library. // Comment for the mocking demo function.
-//
 // For a Java developer: // Guidance for Java background readers.
 // - Similar to Mockito's `when(...).thenReturn(...)` and `verify(...)`. // Comparing to Mockito usage.
 func runMockDemo() { // Function to showcase creating and using a mock.
@@ -171,10 +162,8 @@ func runMockDemo() { // Function to showcase creating and using a mock.
 	// Assert that expectations were met (similar to Mockito's verify(...)) // Comment for verification step.
 	m.AssertExpectations(nil)                     // Verifying that all expectations were satisfied.
 	fmt.Println("   Mock expectations verified.") // Printing verification success message.
-} // End of runMockDemo.
+}
 
-// runErrgroupDemo demonstrates structured concurrency using the errgroup package. // Comment for the errgroup demo function.
-//
 // For a Java developer: // Guidance for Java background readers.
 //   - Similar to `CompletableFuture.allOf()` but with built-in error propagation // Comparing to Java CompletableFuture.
 //     and cancellation (if one task fails, others are cancelled). // Explaining cancellation.
@@ -198,14 +187,14 @@ func runErrgroupDemo() { // Function to showcase errgroup and context cancellati
 				return nil                                    // Indicating success.
 			case <-ctx.Done(): // If the context is cancelled or deadline exceeded.
 				return ctx.Err() // Propagating the context error.
-			} // End of select.
-		}) // End of goroutine function.
-	} // End of loop starting goroutines.
+			}
+		})
+	}
 
 	// Wait blocks until all goroutines have finished, or one returns an error. // Comment for the wait behavior.
 	if err := g.Wait(); err != nil { // Waiting for completion and capturing first error.
 		fmt.Printf("   Error from errgroup: %v\n", err) // Printing error if occurred.
 	} else { // If no errors occurred.
 		fmt.Println("   All tasks in errgroup finished successfully.") // Printing success when all tasks complete.
-	} // End of error handling.
-} // End of runErrgroupDemo.
+	}
+}

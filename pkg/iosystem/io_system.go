@@ -22,6 +22,9 @@ import (
 // For a Java developer:
 //   - Go's `os` and `io` packages are equivalent to `java.io` and `java.nio`.
 //   - `defer` is extensively used for resource management (like try-with-resources).
+//   - Java-ism to avoid: Forgetting to close files/sockets. Use `defer f.Close()`
+//     immediately after checking for errors when opening a resource.
+//   - Java-ism to avoid: Deeply nested directory structures for a simple project.
 //   - The `flag` package is the standard way to build CLI tools (similar to Apache Commons CLI).
 //   - The `net` package provides low-level networking (like `java.net.Socket`).
 //   - `os/exec` is equivalent to `ProcessBuilder` for running external commands.

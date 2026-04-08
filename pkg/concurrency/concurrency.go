@@ -5,6 +5,10 @@
 //     onto a small number of OS threads. They use ~2KB of stack space vs ~1MB in Java.
 //   - Channels (`chan`) are the primary way to communicate between goroutines.
 //     "Don't communicate by sharing memory; share memory by communicating."
+//   - Java-ism to avoid: Using `sync.Mutex` for everything. While Go has Mutexes,
+//     channels are often a cleaner way to coordinate state.
+//   - Java-ism to avoid: Thinking `go` is like `new Thread().start()`. It's much cheaper;
+//     don't be afraid to spawn thousands of them.
 //   - `sync.WaitGroup` is equivalent to Java's `CountDownLatch`.
 //   - `context` is used for cancellation and timeouts, similar to `Future.cancel()`
 //     or passing a `CancellationToken` in other languages.

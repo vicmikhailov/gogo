@@ -14,7 +14,9 @@ import (
 //     automatically satisfies that interface. This is often called "duck typing"
 //     or "structural typing".
 //   - This allows you to define interfaces for types you don't even own (retroactive implementation)!
-//   - Java equivalent: An interface where you don't need to say `implements Shape` on the class.
+//   - Java-ism to avoid: Defining an interface in the same package as the implementation.
+//   - Go idiom: "Accept interfaces, return structs". Define interfaces in the CONSUMER package,
+//     specifying only the methods that the consumer actually needs.
 type Shape interface {
 	// Area returns the surface area of the shape.
 	Area() float64
@@ -44,7 +46,6 @@ func (r Rectangle) Perimeter() float64 {
 	return 2 * (r.Width + r.Height)
 }
 
-// Circle is another struct. Note it doesn't say it implements Shape.
 // It satisfies Shape implicitly because it implements Area and Perimeter.
 //
 // For a Java developer:

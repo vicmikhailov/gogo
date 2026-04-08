@@ -1,4 +1,12 @@
 // Package errors showcases Go's error handling model.
+//
+// For a Java developer:
+//   - Go does NOT use exceptions (`try-catch-finally`).
+//   - Errors are treated as normal values.
+//   - Functions return an `error` as the last return value.
+//   - Java-ism to avoid: Using `panic()` for control flow or expected errors.
+//   - Go way: Only use `panic()` for truly unrecoverable issues (e.g., programmer errors like
+//     dereferencing a nil pointer that shouldn't be nil). Otherwise, always return `error`.
 package errors
 
 import (

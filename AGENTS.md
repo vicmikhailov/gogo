@@ -25,13 +25,22 @@
 | `pkg/web/` | HTTP handlers (`/hello`, `/json`, `/echo`) with logging middleware and JSON body parsing |
 
 ## Go Build System (for Java Developers)
-- **Go tool**: A single executable CLI (`go`) handles build, test, package management, and more. It is a "batteries-included" tool, meaning it doesn't need plugins for core tasks (fmt, vet, test, build).
-- **Go Modules (`go.mod`)**: Equivalent to Maven's `pom.xml` or Gradle's `build.gradle`. It manages dependencies and versioning in a simple text format.
-- **`go build`**: Compiles the source code and dependencies into a single statically-linked binary (similar to a 'Fat JAR' but no JVM needed).
-- **`go test`**: Runs built-in testing framework (similar to JUnit/Maven test). Includes support for benchmarks and fuzzing.
-- **`go mod tidy`**: Cleans up and downloads missing dependencies (similar to Maven import/refresh).
-- **`Makefile`**: Commonly used in Go projects to orchestrate CLI commands into named targets (similar to Maven lifecycle phases like `mvn package` or `mvn test`).
-- **Deployment**: Java requires JRE/JDK on the target machine. Go produces a self-contained binary that can be copied and run without any pre-installed runtime.
+- **Go tool**: A single executable CLI (`go`) handles build, test, package management, and more.
+- **Go Modules (`go.mod`)**: Equivalent to Maven's `pom.xml`.
+- **`go build`**: Compiles into a single statically-linked binary.
+- **`go test`**: Runs unit tests, benchmarks, and fuzzing.
+
+## Common Java-isms to Avoid
+| Java-ism | Idiomatic Go | Why? |
+|---|---|---|
+| Getters/Setters | Direct Field Access | Go prefers simplicity; only use methods for logic/encapsulation. |
+| `Panic` as `Exception` | Return `error` | `Panic` is for unrecoverable errors; `error` is a normal value. |
+| `new` everything | Zero-value usability | Many Go types are ready to use when declared (e.g., `sync.Mutex`). |
+| Deep package nesting | Flat package structure | Go packages should be broad and meaningful, not deeply hierarchical. |
+| Producer-side Interface | Consumer-side Interface | Duck typing allows consumers to define only what they need. |
+| Pointers for everything | Use values by default | Pointers are for mutation or efficiency with large data; values are safer. |
+| Try-Catch blocks | `if err != nil` | Explicit error handling makes control flow obvious. |
+| Object inheritance | Composition (Embedding) | Go favors composition over complex class hierarchies. |
 
 ## Critical workflows
 - Run with Makefile (Recommended): `make run`
