@@ -6,12 +6,13 @@
 
 ## Big-picture architecture
 - `cmd/gogo/main.go` is an ordered orchestrator that calls each demo in sequence, ending with a web server:
-  `concurrency.RunConcurrencyDemo` → `interfaces.RunInterfacesDemo` → `generics.RunGenericsDemo` → `errors.RunErrorsDemo` → `collections.RunCollectionsDemo` → `basictypes.RunBasicTypesDemo` → `patterns.RunPatternsDemo` → `advanced.RunAdvancedDemo` → `iosystem.RunIOSystemDemo` → `commonlibs.RunCommonLibsDemo` → `web.StartWebServer("8080")`.
+  `syntax.RunSyntaxDemo` → `concurrency.RunConcurrencyDemo` → `interfaces.RunInterfacesDemo` → `generics.RunGenericsDemo` → `errors.RunErrorsDemo` → `collections.RunCollectionsDemo` → `basictypes.RunBasicTypesDemo` → `patterns.RunPatternsDemo` → `advanced.RunAdvancedDemo` → `iosystem.RunIOSystemDemo` → `commonlibs.RunCommonLibsDemo` → `web.StartWebServer("8080")`.
 - Most demos are print-driven and side-effect-based (stdout), so behavior is observed by running the binary.
 
 ### File responsibilities
 | Package/File | Purpose |
 |---|---|
+| `pkg/syntax/` | Core syntax: variables, multiple returns, named returns, pointers vs values, defer, zero-values, visibility, iota enums |
 | `pkg/concurrency/` | Goroutines, channels, `sync.WaitGroup`, `context.WithTimeout`, Worker Pool, Context Value Propagation |
 | `pkg/interfaces/` | `Shape` interface, `Rectangle`/`Circle`, polymorphism, type assertion, type switch |
 | `pkg/generics/` | `List[T]`, `MapValues[T,R]` generic helpers |

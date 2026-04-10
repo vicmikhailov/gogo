@@ -32,6 +32,7 @@ The project is structured to be discoverable:
 - `pkg/`: Contains sub-packages, each focusing on a specific Go concept.
 
 ### 📦 Key Demos
+- **Go Syntax**: Core syntax differences for Java developers (Variables, Pointers, multiple returns).
 - **Concurrency**: Goroutines and Channels (≈ Threads and BlockingQueues).
 - **Interfaces**: Implicit implementation (≈ Duck Typing).
 - **Generics**: Type-safe collections and helpers.
