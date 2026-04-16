@@ -21,31 +21,32 @@ import (
 // ---------------------------------------------------------------------------
 
 // For a Java developer: // Explanation targeted at Java developers.
-//   - Go's `slice` is a dynamic array (like `ArrayList<T>`). // Comparing slices to Java ArrayList.
-//   - Slice is a view into an underlying array. When you slice a slice, they share memory. // Explaining the view nature of slices.
-//   - The zero-value of a slice is `nil` (like an uninitialized Java List). // Noting the nil zero-value.
-//   - There's no formal `List` interface in the standard library. // Clarifying the lack of a List interface.
-//   - Slices are passed by value, but the value is a "slice header" (pointer, length, capacity). // Explaining slice passing semantics.
+//   - Go's `slice` is a dynamic array (like `ArrayList<T>`). 
+//   - Slice is a view into an underlying array. When you slice a slice, they share memory. 
+//   - The zero-value of a slice is `nil` (like an uninitialized Java List). 
+//   - There's no formal `List` interface in the standard library. 
+//   - Slices are passed by value, but the value is a "slice header" (pointer, length, capacity). 
+
 func RunSliceManipulationDemo() {
 	fmt.Println("\n--- Slice (List) Manipulation Demo ---") // Printing the demo header.
 
 	// a. Creation: make(type, len, cap) // Comment for slice creation.
-	// Java equivalent: List<Integer> list = new ArrayList<>(10); // Comparing to Java list creation.
+	// Java equivalent: List<Integer> list = new ArrayList<>(10); 
 	nums := make([]int, 0, 5)                                                  // Creating an int slice with initial length 0 and capacity 5.
 	fmt.Printf("   Initial: len=%d, cap=%d, %v\n", len(nums), cap(nums), nums) // Printing initial length and capacity.
 
-	// b. Adding: append(slice, element...) // Comment for adding elements to a slice.
-	// Java equivalent: list.add(10); // Comparing to Java list add.
+	// b. Adding: append(slice, element...) 
+	// Java equivalent: list.add(10); 
 	nums = append(nums, 1, 2, 3)              // Appending elements 1, 2, and 3 to the slice.
 	fmt.Printf("   After append: %v\n", nums) // Printing the slice after appending.
 
-	// c. Slicing: slice[start:end] (half-open interval [start, end)) // Comment for slicing operations.
-	// Java equivalent: list.subList(1, 3); // Comparing to Java subList.
+	// c. Slicing: slice[start:end] (half-open interval [start, end)) 
+	// Java equivalent: list.subList(1, 3); 
 	sub := nums[1:3]                            // Creating a sub-slice from index 1 to 2 (index 3 is excluded).
 	fmt.Printf("   Sub-slice [1:3]: %v\n", sub) // Printing the sub-slice.
 
-	// d. Length and Capacity // Comment for length and capacity.
-	// len() is current size, cap() is the size of the underlying array. // Explaining len vs cap.
+	// d. Length and Capacity 
+	// len() is current size, cap() is the size of the underlying array. 
 	fmt.Printf("   Length: %d, Capacity: %d\n", len(nums), cap(nums)) // Printing current length and capacity.
 
 	// e. Iteration: range (returns index and value) // Comment for iterating over a slice.
