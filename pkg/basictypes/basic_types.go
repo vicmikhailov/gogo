@@ -17,252 +17,264 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// 1. Slice (List) Manipulation (Standard idiomatic ways) // Section header for Slice manipulation.
+// 1. Slice (List) Manipulation (Standard idiomatic ways)
 // ---------------------------------------------------------------------------
 
-// For a Java developer: // Explanation targeted at Java developers.
-//   - Go's `slice` is a dynamic array (like `ArrayList<T>`). 
-//   - Slice is a view into an underlying array. When you slice a slice, they share memory. 
-//   - The zero-value of a slice is `nil` (like an uninitialized Java List). 
-//   - There's no formal `List` interface in the standard library. 
-//   - Slices are passed by value, but the value is a "slice header" (pointer, length, capacity). 
-
+// RunSliceManipulationDemo demonstrates standard slice operations.
+//
+// For a Java developer:
+//   - Go's `slice` is a dynamic array view (like `ArrayList<T>`).
+//   - Slices are views into an underlying array. When you re-slice, they share memory.
+//   - The zero-value of a slice is `nil` (like an uninitialized Java List).
+//   - There is no formal `List` interface in the standard library.
+//   - Slices are passed by value, but the value is a 24-byte header (pointer, length, capacity).
+//   - Operations:
+//   - Creation: make([]T, len, cap)  (Java: new ArrayList<>(cap))
+//   - Adding:   append(slice, items) (Java: list.add(item))
+//   - Slicing:  slice[start:end]     (Java: list.subList(start, end) - half-open interval)
+//   - Capacity: len() is current size, cap() is underlying buffer size
+//   - Range:    for i, v := range slice (Java: for loop or Stream with index)
+//   - Copying:  copy(dest, src) copies elements between slices
 func RunSliceManipulationDemo() {
-	fmt.Println("\n--- Slice (List) Manipulation Demo ---") // Printing the demo header.
+	fmt.Println("\n--- Slice (List) Manipulation Demo ---")
 
-	// a. Creation: make(type, len, cap) // Comment for slice creation.
-	// Java equivalent: List<Integer> list = new ArrayList<>(10); 
-	nums := make([]int, 0, 5)                                                  // Creating an int slice with initial length 0 and capacity 5.
-	fmt.Printf("   Initial: len=%d, cap=%d, %v\n", len(nums), cap(nums), nums) // Printing initial length and capacity.
+	// a. Creation: make(type, len, cap)
+	// Java equivalent: List<Integer> list = new ArrayList<>(10);
+	nums := make([]int, 0, 5)
+	fmt.Printf("   Initial: len=%d, cap=%d, %v\n", len(nums), cap(nums), nums)
 
-	// b. Adding: append(slice, element...) 
-	// Java equivalent: list.add(10); 
-	nums = append(nums, 1, 2, 3)              // Appending elements 1, 2, and 3 to the slice.
-	fmt.Printf("   After append: %v\n", nums) // Printing the slice after appending.
+	// b. Adding: append(slice, element...)
+	// Java equivalent: list.add(10);
+	nums = append(nums, 1, 2, 3)
+	fmt.Printf("   After append: %v\n", nums)
 
-	// c. Slicing: slice[start:end] (half-open interval [start, end)) 
-	// Java equivalent: list.subList(1, 3); 
-	sub := nums[1:3]                            // Creating a sub-slice from index 1 to 2 (index 3 is excluded).
-	fmt.Printf("   Sub-slice [1:3]: %v\n", sub) // Printing the sub-slice.
+	// c. Slicing: slice[start:end] (half-open interval [start, end))
+	// Java equivalent: list.subList(1, 3);
+	sub := nums[1:3]
+	fmt.Printf("   Sub-slice [1:3]: %v\n", sub)
 
-	// d. Length and Capacity 
-	// len() is current size, cap() is the size of the underlying array. 
-	fmt.Printf("   Length: %d, Capacity: %d\n", len(nums), cap(nums)) // Printing current length and capacity.
+	// d. Length and Capacity
+	fmt.Printf("   Length: %d, Capacity: %d\n", len(nums), cap(nums))
 
-	// e. Iteration: range (returns index and value) // Comment for iterating over a slice.
-	// Java equivalent: for (int i=0; i < list.size(); i++) { ... } // Comparing to Java for-loop.
-	fmt.Print("   Iteration: ") // Printing a label for iteration.
-	for i, v := range nums {    // Iterating through the slice using range to get index and value.
-		fmt.Printf("[%d]:%d ", i, v) // Printing index and value for each element.
+	// e. Iteration: range returns index and value
+	// Java equivalent: for (int i=0; i < list.size(); i++) { ... }
+	fmt.Print("   Iteration: ")
+	for i, v := range nums {
+		fmt.Printf("[%d]:%d ", i, v)
 	}
-	fmt.Println() // Printing a newline for formatting.
+	fmt.Println()
 
-	// f. Copying: copy(dest, src) // Comment for copying slices.
-	backup := make([]int, len(nums))             // Creating a destination slice with the same length as the source.
-	copy(backup, nums)                           // Copying elements from nums to backup.
-	fmt.Printf("   Copy (backup): %v\n", backup) // Printing the copied slice.
+	// f. Copying: copy(dest, src)
+	backup := make([]int, len(nums))
+	copy(backup, nums)
+	fmt.Printf("   Copy (backup): %v\n", backup)
 }
 
 // ---------------------------------------------------------------------------
-// 2. Map Manipulation (Standard idiomatic ways) // Section header for Map manipulation.
+// 2. Map Manipulation (Standard idiomatic ways)
 // ---------------------------------------------------------------------------
 
-// For a Java developer: // Explanation targeted at Java developers.
-//   - Go's `map` is a hash map (like `HashMap<K, V>`). // Comparing Go maps to Java HashMaps.
-//   - Iteration order is randomized to prevent dependence on it (Java doesn't guarantee order in HashMap either). // Explaining random iteration order.
-//   - Maps are reference types; passing to functions modifies the original map. // Explaining map reference semantics.
-//   - Accessing a non-existent key returns the zero-value (e.g., 0 for int, "" for string) instead of throwing an exception or returning null. // Explaining missing key behavior.
+// RunMapManipulationDemo demonstrates hash map operations in Go.
+//
+// For a Java developer:
+//   - Go's `map` is a hash map (like `HashMap<K, V>`).
+//   - Iteration order is randomized to prevent code from relying on specific ordering.
+//   - Maps are reference types; passing a map to a function allows mutating the original map.
+//   - Accessing a non-existent key returns the zero-value (0, "", nil) instead of throwing an exception or returning null.
+//   - The "comma ok" idiom (`v, ok := m[key]`) is used to test whether a key exists.
+//   - To iterate in deterministic order, extract keys into a slice and sort them first.
 func RunMapManipulationDemo() {
-	fmt.Println("\n--- Map Manipulation Demo ---") // Printing the demo header.
+	fmt.Println("\n--- Map Manipulation Demo ---")
 
-	// a. Creation: make(map[KeyType]ValueType) // Comment for map creation.
-	// Java equivalent: Map<String, Integer> map = new HashMap<>(); // Comparing to Java map creation.
-	ages := make(map[string]int) // Creating a map with string keys and int values.
+	// a. Creation: make(map[KeyType]ValueType)
+	// Java equivalent: Map<String, Integer> map = new HashMap<>();
+	ages := make(map[string]int)
 
-	// b. Adding / Updating // Comment for adding or updating map entries.
-	// Java equivalent: map.put("Alice", 30); // Comparing to Java map put.
-	ages["Alice"] = 30                       // Setting the value for key "Alice" to 30.
-	ages["Bob"] = 25                         // Setting the value for key "Bob" to 25.
-	fmt.Printf("   Initial map: %v\n", ages) // Printing the initial map.
+	// b. Adding / Updating
+	// Java equivalent: map.put("Alice", 30);
+	ages["Alice"] = 30
+	ages["Bob"] = 25
+	fmt.Printf("   Initial map: %v\n", ages)
 
-	// c. Existence check: the "comma ok" idiom // Comment for checking key existence.
-	// Java equivalent: map.containsKey("Alice"); // Comparing to Java containsKey.
-	age, ok := ages["Alice"] // Attempting to retrieve value for "Alice" and existence status.
-	if ok {                  // Checking if the key was found.
-		fmt.Printf("   Alice's age is %d\n", age) // Printing the age if found.
+	// c. Existence check: the "comma ok" idiom
+	// Java equivalent: map.containsKey("Alice");
+	age, ok := ages["Alice"]
+	if ok {
+		fmt.Printf("   Alice's age is %d\n", age)
 	}
 
-	// d. Deleting: delete(map, key) // Comment for deleting map entries.
-	// Java equivalent: map.remove("Bob"); // Comparing to Java map remove.
-	delete(ages, "Bob")                            // Deleting the entry for key "Bob" from the map.
-	fmt.Printf("   After delete(Bob): %v\n", ages) // Printing the map after deletion.
+	// d. Deleting: delete(map, key)
+	// Java equivalent: map.remove("Bob");
+	delete(ages, "Bob")
+	fmt.Printf("   After delete(Bob): %v\n", ages)
 
-	// e. Iteration (Warning: Order is random!) // Comment for map iteration.
-	fmt.Print("   Iteration (order varies): ") // Printing iteration label.
-	for name, age := range ages {              // Iterating through map entries using range.
-		fmt.Printf("%s:%d ", name, age) // Printing name and age for each entry.
+	// e. Iteration (Warning: Order is random!)
+	fmt.Print("   Iteration (order varies): ")
+	for name, age := range ages {
+		fmt.Printf("%s:%d ", name, age)
 	}
-	fmt.Println() // Printing a newline.
+	fmt.Println()
 
-	// f. Deterministic Iteration (Sort keys first) // Comment for deterministic map iteration.
-	fmt.Print("   Deterministic iteration: ") // Printing label.
-	ages["Charlie"] = 35                      // Adding key "Charlie" to the map.
-	ages["Alpha"] = 20                        // Adding key "Alpha" to the map.
-	keys := make([]string, 0, len(ages))      // Creating a slice to hold the map keys.
-	for k := range ages {                     // Iterating through map keys to collect them.
-		keys = append(keys, k) // Appending each key to the keys slice.
+	// f. Deterministic Iteration (Sort keys first)
+	fmt.Print("   Deterministic iteration: ")
+	ages["Charlie"] = 35
+	ages["Alpha"] = 20
+	keys := make([]string, 0, len(ages))
+	for k := range ages {
+		keys = append(keys, k)
 	}
-	sort.Strings(keys)       // Sorting the collected keys alphabetically.
-	for _, k := range keys { // Iterating through the sorted keys.
-		fmt.Printf("%s:%d ", k, ages[k]) // Printing each key and its corresponding value.
+	sort.Strings(keys)
+	for _, k := range keys {
+		fmt.Printf("%s:%d ", k, ages[k])
 	}
-	fmt.Println() // Printing a newline.
+	fmt.Println()
 }
 
 // ---------------------------------------------------------------------------
-// 3. String Operations (Standard Library) // Section header for String operations.
+// 3. String Operations (Standard Library)
 // ---------------------------------------------------------------------------
 
-// For a Java developer: // Explanation targeted at Java developers.
-//   - Strings in Go are immutable sequences of bytes (usually UTF-8). // Describing string nature in Go.
-//   - Unlike Java's `String` which is `char[]` (UTF-16), Go strings are `byte[]`. // Contrasting with Java string internal representation.
-//   - Use the `strings` package for most operations. // Recommending the strings package.
-//   - String concatenation with `+` is fine for small cases, // Noting when + is acceptable.
-//     but `strings.Builder` is preferred for loops (like `StringBuilder`). // Recommending strings.Builder for efficiency.
-//   - Go uses backticks (“) for raw string literals (like Java 15's Text Blocks). // Comparing raw strings to Java text blocks.
+// RunStringOperationsDemo showcases string functions from the standard library.
+//
+// For a Java developer:
+//   - Strings in Go are immutable sequences of bytes (UTF-8 encoded by default).
+//   - Unlike Java's `String` (which is backed by `char[]` / UTF-16), Go strings are `byte[]`.
+//   - `len(str)` returns the number of BYTES, not characters.
+//   - Use `[]rune(str)` to get Unicode code points (runes).
+//   - Use `strings.Builder` for efficient concatenation in loops (like Java `StringBuilder`).
+//   - Go backticks (`) define raw multiline strings (like Java 15+ Text Blocks).
 func RunStringOperationsDemo() {
-	fmt.Println("\n--- String Operations Demo ---") // Printing the demo header.
+	fmt.Println("\n--- String Operations Demo ---")
 
-	text := "Go is a statically typed, compiled programming language." // Defining a sample string.
+	text := "Go is a statically typed, compiled programming language."
 
-	// a. Basic checks // Comment for basic string status checks.
-	fmt.Printf("   Contains 'typed':   %t\n", strings.Contains(text, "typed")) // Checking if string contains "typed".
-	fmt.Printf("   Has prefix 'Go':    %t\n", strings.HasPrefix(text, "Go"))   // Checking if string starts with "Go".
-	fmt.Printf("   Has suffix 'Java':  %t\n", strings.HasSuffix(text, "Java")) // Checking if string ends with "Java".
+	// a. Basic checks: Contains, HasPrefix, HasSuffix
+	fmt.Printf("   Contains 'typed':   %t\n", strings.Contains(text, "typed"))
+	fmt.Printf("   Has prefix 'Go':    %t\n", strings.HasPrefix(text, "Go"))
+	fmt.Printf("   Has suffix 'Java':  %t\n", strings.HasSuffix(text, "Java"))
 
-	// b. Manipulation // Comment for basic string transformations.
-	fmt.Printf("   Upper:              %s\n", strings.ToUpper("go rocks"))              // Converting a string to uppercase.
-	fmt.Printf("   Replace:            %s\n", strings.Replace(text, "Go", "Golang", 1)) // Replacing the first occurrence of "Go" with "Golang".
+	// b. Manipulation: ToUpper, Replace
+	fmt.Printf("   Upper:              %s\n", strings.ToUpper("go rocks"))
+	fmt.Printf("   Replace:            %s\n", strings.Replace(text, "Go", "Golang", 1))
 
-	// c. Splitting and Joining // Comment for splitting and joining strings.
-	words := strings.Fields(text)                         // Splitting the string into a slice of words by whitespace.
-	fmt.Printf("   Words count:        %d\n", len(words)) // Printing the number of words found.
-	joined := strings.Join(words[:3], "-")                // Joining the first three words with hyphens.
-	fmt.Printf("   Join first three:   %s\n", joined)     // Printing the joined string.
+	// c. Splitting and Joining: Fields, Join
+	words := strings.Fields(text)
+	fmt.Printf("   Words count:        %d\n", len(words))
+	joined := strings.Join(words[:3], "-")
+	fmt.Printf("   Join first three:   %s\n", joined)
 
-	// d. Trimming // Comment for trimming whitespace from strings.
-	dirty := "   \t hello world \n  "                                    // Defining a string with excessive whitespace.
-	fmt.Printf("   Trimmed:           '%s'\n", strings.TrimSpace(dirty)) // Printing the string after trimming space.
+	// d. Trimming whitespace
+	dirty := "   \t hello world \n  "
+	fmt.Printf("   Trimmed:           '%s'\n", strings.TrimSpace(dirty))
 
-	// e. strings.Builder (Performance like StringBuilder) // Comment for strings.Builder usage.
-	var builder strings.Builder // Declaring a strings.Builder instance.
-	for i := 1; i <= 3; i++ {   // Loop to append multiple strings efficiently.
-		builder.WriteString(fmt.Sprintf("Step %d; ", i)) // Writing a formatted string to the builder.
+	// e. strings.Builder (Performance like StringBuilder)
+	var builder strings.Builder
+	for i := 1; i <= 3; i++ {
+		builder.WriteString(fmt.Sprintf("Step %d; ", i))
 	}
-	fmt.Printf("   Builder result:     %s\n", builder.String()) // Printing the final string built by the builder.
+	fmt.Printf("   Builder result:     %s\n", builder.String())
 
-	// f. Unicode / Runes // Comment for handling Unicode characters and runes.
-	// Java equivalent: String.codePointAt() // Comparing to Java's codePointAt.
-	japanese := "こんにちは"                                                        // "Konnichiwa" in Japanese characters.
-	fmt.Printf("   Bytes length:       %d (not characters!)\n", len(japanese)) // Printing the length of the string in bytes.
-	fmt.Printf("   Runes count:        %d\n", len([]rune(japanese)))           // Printing the count of actual Unicode characters (runes).
+	// f. Unicode / Runes
+	// Java equivalent: String.codePointAt()
+	japanese := "こんにちは"
+	fmt.Printf("   Bytes length:       %d (not characters!)\n", len(japanese))
+	fmt.Printf("   Runes count:        %d\n", len([]rune(japanese)))
 }
 
 // ---------------------------------------------------------------------------
-// 4. JSON Manipulation (Standard Library) // Section header for JSON manipulation.
+// 4. JSON Manipulation (Standard Library)
 // ---------------------------------------------------------------------------
 
-// For a Java developer: // Explanation targeted at Java developers.
-// - Struct tags like `json:"id"` are similar to Jackson's `@JsonProperty("id")`. // Comparing struct tags to Jackson annotations.
-// - Fields must be capitalized (Exported) for the `encoding/json` package to see them. // Noting that visibility affects serialization.
-// - This is Go's way of doing meta-programming/reflection-based serialization. // Describing Go's serialization mechanism.
-// - Marshalling = Serializing (Object to JSON). // Defining marshalling.
-// - Unmarshalling = Deserializing (JSON to Object). // Defining unmarshalling.
+// Product demonstrates struct tags used for JSON serialization.
+//
+// For a Java developer:
+//   - Struct tags like `json:"id"` are similar to Jackson's `@JsonProperty("id")`.
+//   - Fields must be uppercase (Exported) for `encoding/json` to access them.
+//   - `omitempty` omits the field when serializing if it has its zero value.
+//   - `json:"-"` ignores the field entirely during JSON serialization.
 type Product struct {
-	ID    int      `json:"id"`             // Field ID mapped to JSON key "id".
-	Name  string   `json:"name"`           // Field Name mapped to JSON key "name".
-	Price float64  `json:"price"`          // Field Price mapped to JSON key "price".
-	Tags  []string `json:"tags,omitempty"` // Field Tags mapped to "tags" and omitted if empty in JSON.
+	ID    int      `json:"id"`
+	Name  string   `json:"name"`
+	Price float64  `json:"price"`
+	Tags  []string `json:"tags,omitempty"`
 }
 
-// For a Java developer: // Explanation targeted at Java developers.
-// - Marshalling in Go is equivalent to calling `objectMapper.writeValueAsString()`. // Comparing to Jackson's Marshalling.
-// - Unmarshalling is equivalent to `objectMapper.readValue()`. // Comparing to Jackson's Unmarshalling.
-// - Error handling is explicit, unlike Java's `JsonProcessingException`. // Noting Go's explicit error handling style.
+// RunJSONDemo demonstrates JSON marshaling and unmarshaling.
+//
+// For a Java developer:
+//   - Marshalling = Serializing (Object to JSON, like `objectMapper.writeValueAsString()`).
+//   - Unmarshalling = Deserializing (JSON to Object, like `objectMapper.readValue()`).
+//   - Error handling is explicit via return values, unlike Java's `JsonProcessingException`.
+//   - Dynamic schemas can be deserialized into `map[string]any` (like `Map<String, Object>`).
 func RunJSONDemo() {
-	fmt.Println("\n--- JSON Manipulation Demo ---") // Printing the demo header.
+	fmt.Println("\n--- JSON Manipulation Demo ---")
 
-	// a. Marshalling (Struct to JSON) // Comment for converting struct to JSON.
-	p := Product{ // Initializing a Product instance.
-		ID:    101,                       // Setting ID.
-		Name:  "Gopher Plushie",          // Setting Name.
-		Price: 19.99,                     // Setting Price.
-		Tags:  []string{"toy", "mascot"}, // Setting Tags.
+	// a. Marshalling (Struct to JSON)
+	p := Product{
+		ID:    101,
+		Name:  "Gopher Plushie",
+		Price: 19.99,
+		Tags:  []string{"toy", "mascot"},
 	}
-	jsonData, _ := json.MarshalIndent(p, "   ", "  ")     // Converting the Product to indented JSON bytes.
-	fmt.Printf("   JSON Output:\n%s\n", string(jsonData)) // Printing the resulting JSON string.
+	jsonData, _ := json.MarshalIndent(p, "   ", "  ")
+	fmt.Printf("   JSON Output:\n%s\n", string(jsonData))
 
-	rawJSON := `{"id": 102, "name": "Go Mug", "price": 12.50}` // Defining a raw JSON string.
-	var p2 Product                                             // Declaring a Product variable to hold the unmarshalled data.
+	// b. Unmarshalling (JSON to Struct)
+	rawJSON := `{"id": 102, "name": "Go Mug", "price": 12.50}`
+	var p2 Product
 	err := json.Unmarshal([]byte(rawJSON), &p2)
-	if err == nil { // Checking if unmarshalling succeeded.
+	if err == nil {
 		fmt.Printf("   Unmarshalled Struct: %+v\n", p2)
 	}
 
-	// c. Arbitrary JSON (using map[string]any) // Comment for handling dynamic JSON schemas.
-	// Useful when you don't know the schema (like Java Map<String, Object>). // Explaining why dynamic mapping is useful.
-	var data map[string]any                      // Declaring a map to hold dynamic JSON data.
-	err = json.Unmarshal([]byte(rawJSON), &data) // Unmarshalling JSON bytes into the map.
-	if err == nil {                              // Checking if unmarshalling succeeded.
-		fmt.Printf("   Map representation:  %v (Name: %v)\n", data, data["name"]) // Printing the map and a specific value.
+	// c. Arbitrary JSON (using map[string]any)
+	// Useful when the schema is dynamic or unknown (like Java Map<String, Object>).
+	var data map[string]any
+	err = json.Unmarshal([]byte(rawJSON), &data)
+	if err == nil {
+		fmt.Printf("   Map representation:  %v (Name: %v)\n", data, data["name"])
 	}
 
-	// d. JSON with Custom Logic (Filtering/Validation) // Comment for advanced JSON features.
-	// Demonstrating 'omitempty' and ignored fields // Highlighting special JSON tag features.
-	pEmpty := Product{ID: 1, Name: "Invisible"}                  // Initializing a Product with some empty fields.
-	emptyJSON, _ := json.Marshal(pEmpty)                         // Marshalling the product to see omitempty in action.
-	fmt.Printf("   Omitempty Tags:     %s\n", string(emptyJSON)) // Printing the JSON result.
+	// d. JSON with Custom Logic (omitempty)
+	pEmpty := Product{ID: 1, Name: "Invisible"}
+	emptyJSON, _ := json.Marshal(pEmpty)
+	fmt.Printf("   Omitempty Tags:     %s\n", string(emptyJSON))
 }
 
-// For a Java developer: // Explanation targeted at Java developers.
-// - This is the "facade" for all basic types demonstrations. // Comparing to the facade pattern.
+// RunBasicTypesDemo is the facade orchestrator for all basic types demonstrations.
 func RunBasicTypesDemo() {
-	fmt.Println("--- Basic Types & Standard Library Demo ---") // Printing the overall section header.
-	RunSliceManipulationDemo()                                 // Running the slice manipulation demo.
-	RunMapManipulationDemo()                                   // Running the map manipulation demo.
-	RunStringOperationsDemo()                                  // Running the string operations demo.
-	RunJSONDemo()                                              // Running the JSON manipulation demo.
-	fmt.Println("--- Basic Types & Standard Library End ---")  // Printing the section footer.
+	fmt.Println("--- Basic Types & Standard Library Demo ---")
+	RunSliceManipulationDemo()
+	RunMapManipulationDemo()
+	RunStringOperationsDemo()
+	RunJSONDemo()
+	fmt.Println("--- Basic Types & Standard Library End ---")
 }
 
-// ReverseString is a utility function used for demonstrating string manipulation. // Comment for the ReverseString utility.
-// It uses runes to correctly handle multi-byte characters (UTF-8). // Explaining the use of runes for UTF-8 safety.
+// ReverseString reverses a UTF-8 string by operating on runes.
 //
-// For a Java developer: // Explanation targeted at Java developers.
-//   - Strings in Go are UTF-8 encoded by default. // Noting Go string encoding.
-//   - Iterating over a string using `range` gives you `runes` (Unicode code points), // Explaining range behavior on strings.
-//     not bytes or characters. // Noting that it returns code points.
-//   - `rune` is an alias for `int32`, representing a Unicode code point. // Defining what a rune is.
-//   - This is necessary because Go's `string` length is in bytes, not characters. // Explaining the rationale for using runes.
-func ReverseString(s string) string { // ReverseString function taking and returning a string.
-	runes := []rune(s)                                    // Converting the string to a slice of runes.
-	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 { // Two-pointer loop to reverse the rune slice.
-		runes[i], runes[j] = runes[j], runes[i] // Swapping runes in-place.
+// For a Java developer:
+//   - Strings in Go are UTF-8 encoded by default.
+//   - Iterating over a string using `range` yields `runes` (Unicode code points).
+//   - `rune` is an alias for `int32`.
+//   - Operating on runes ensures multi-byte characters (e.g. Japanese, emojis) are not corrupted.
+func ReverseString(s string) string {
+	runes := []rune(s)
+	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
+		runes[i], runes[j] = runes[j], runes[i]
 	}
-	return string(runes) // Converting the reversed rune slice back to a string and returning it.
+	return string(runes)
 }
 
-// For a Java developer: // Explanation targeted at Java developers.
-// - Demonstrates usage of `strings.Builder` and the `unicode` package. // Highlighting key standard library usage.
-// - `strings.Builder` is the Go equivalent of `StringBuilder`. // Comparing to Java StringBuilder.
-// - Shows how to iterate over runes in a string. // Noting the demonstration of rune iteration.
-func IsPalindrome(s string) bool { // IsPalindrome function returning a boolean.
-	var builder strings.Builder // Declaring a strings.Builder for normalized string construction.
-	for _, r := range s {       // Iterating through each rune of the input string.
-		if unicode.IsLetter(r) || unicode.IsDigit(r) { // Filtering for letters and digits.
-			builder.WriteRune(unicode.ToLower(r)) // Writing the lowercase version of the rune to the builder.
+// IsPalindrome reports whether s is a palindrome, ignoring case and non-alphanumeric characters.
+// Demonstrates usage of `strings.Builder` and `unicode` functions (`IsLetter`, `IsDigit`, `ToLower`).
+func IsPalindrome(s string) bool {
+	var builder strings.Builder
+	for _, r := range s {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			builder.WriteRune(unicode.ToLower(r))
 		}
 	}
-	clean := builder.String()            // Getting the normalized string from the builder.
-	return clean == ReverseString(clean) // Checking if the cleaned string is equal to its reverse.
+	clean := builder.String()
+	return clean == ReverseString(clean)
 }

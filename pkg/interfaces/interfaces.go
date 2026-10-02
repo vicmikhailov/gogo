@@ -46,10 +46,10 @@ func (r Rectangle) Perimeter() float64 {
 	return 2 * (r.Width + r.Height)
 }
 
-// It satisfies Shape implicitly because it implements Area and Perimeter.
+// Circle satisfies Shape implicitly because it implements Area and Perimeter.
 //
 // For a Java developer:
-// - There is no `implements Shape` here, but Go sees the methods match.
+//   - There is no `implements Shape` here, but Go sees the methods match.
 type Circle struct {
 	Radius float64
 }
@@ -68,8 +68,8 @@ func (c Circle) Perimeter() float64 {
 
 // PrintShapeDetails accepts any Shape and prints its details.
 // Java equivalent: `public void printShapeDetails(Shape s)`
+// Note: `%T` in fmt prints the concrete dynamic type of the interface value.
 func PrintShapeDetails(s Shape) {
-	// %T prints the type of the variable.
 	fmt.Printf("   Type: %T, Area: %.2f, Perimeter: %.2f\n", s, s.Area(), s.Perimeter())
 }
 
@@ -90,9 +90,10 @@ func RunInterfacesDemo() {
 
 	// 2. Type assertion
 	// Java equivalent: `if (s instanceof Circle) { Circle circle = (Circle) s; ... }`
+	// The comma-ok idiom (`circle, ok := s.(Circle)`) returns the asserted value and true if successful.
 	fmt.Println("2. Type assertion:")
 	var s Shape = Circle{Radius: 10}
-	if circle, ok := s.(Circle); ok { // 'ok' is true if the assertion succeeded
+	if circle, ok := s.(Circle); ok {
 		fmt.Printf("   Successfully asserted as Circle with Radius: %.2f\n", circle.Radius)
 	}
 

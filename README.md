@@ -38,7 +38,7 @@ The project is structured to be discoverable:
 - **Generics**: Type-safe collections and helpers.
 - **Errors**: Error-as-value handling (≈ Checked Exceptions).
 - **Collections**: Functional slice operations (≈ Java Stream API).
-- **Patterns**: GoF patterns implemented idiomatically in Go.
+- **Patterns & Antipatterns**: GoF patterns implemented idiomatically, plus 10 crucial Go antipatterns that Java developers must unlearn.
 - **Advanced**: Reflection, Struct Tags (≈ Annotations), and Build System deep-dive.
 - **Common Libraries**: Popular third-party libraries (zap, uuid, gin, testify).
 
@@ -63,6 +63,47 @@ Go makes it trivial to build for other operating systems from your local machine
 # Build for Linux from Mac/Windows
 GOOS=linux GOARCH=amd64 go build -o app_linux ./cmd/gogo
 ```
+
+## 🧩 Go Patterns & Antipatterns Guide (for Java Developers)
+
+Java developers bring years of object-oriented assumptions, JVM runtime knowledge, and Spring architectural patterns to Go. While these patterns are effective in Java, applying them directly to Go leads to subtle bugs, performance degradation, and unidiomatic code.
+
+### 🌟 Idiomatic Go Patterns
+
+1. **Functional Options Pattern**:
+   - *Java Equivalent*: Builder Pattern (`new ServerConfigBuilder().port(8080).build()`) or overloaded constructors.
+   - *Go Idiom*: Variadic functions accepting closures `func WithTimeout(d time.Duration) Option`. Allows extensible, readable configuration with sensible defaults without constructor explosion.
+2. **Consumer-Driven Interfaces ("Accept Interfaces, Return Structs")**:
+   - *Java Equivalent*: Producer interfaces (`public interface UserService` in the same package as `UserServiceImpl`).
+   - *Go Idiom*: Producers export concrete structs. Consumers declare tiny 1–2 method interfaces (e.g. `io.Reader`, `CustomerFinder`) specifying *only what the caller needs*. Duck typing satisfies them automatically.
+3. **Errors as Values**:
+   - *Java Equivalent*: Checked/Unchecked Exceptions (`try { ... } catch (IOException e)`).
+   - *Go Idiom*: Multiple return values `(Result, error)` inspected explicitly with `if err != nil`. Errors wrapped with `fmt.Errorf("context: %w", err)` and inspected with `errors.Is` and `errors.As`.
+4. **Channel Pipelines & Fan-Out / Fan-In**:
+   - *Java Equivalent*: `ExecutorService`, `ForkJoinPool`, `CompletableFuture.allOf()`.
+   - *Go Idiom*: Goroutines communicating over typed channels, synchronized using `sync.WaitGroup` or `golang.org/x/sync/errgroup`.
+5. **Thread-Safe Lazy Initialization (`sync.Once`)**:
+   - *Java Equivalent*: Double-checked locking `volatile instance` or `enum Singleton { INSTANCE; }`.
+   - *Go Idiom*: `sync.Once.Do(func() { ... })` provides thread-safe, race-free single execution with minimal synchronization overhead.
+
+---
+
+### ⚠️ Top 10 Go Antipatterns for Java Developers
+
+| # | Antipattern | Java Mental Model | What Breaks in Go | Idiomatic Go Fix |
+|---|---|---|---|---|
+| **1** | **The Nil Interface Trap** | Returning `null` exception reference means no exception. | An interface is `(Type, Value)`. Returning a typed `*MyError(nil)` produces an interface with non-nil Type, so `err != nil` evaluates to **`true`**! | Always return the untyped literal `nil` for no-error: `return nil`. |
+| **2** | **Passing Mutex by Value** | Objects are references on the heap; passing passes the reference. | Structs are value types. Passing a struct with `sync.Mutex` creates a separate copy of the lock state, breaking mutual exclusion. | Always use pointer receivers (`*Counter`) and pass pointers. `go vet` catches this with `copylocks`. |
+| **3** | **Goroutine Leaks** | Worker threads are bounded by `ExecutorService` or daemon pools. | Goroutines blocked on unbuffered channels with no receiver are never garbage collected, leaking stack memory and handles forever. | Use buffered channels (`make(chan T, 1)`) for single-result workers, and pass `context.Context` for cancellation. |
+| **4** | **Interface Pollution** | Every service must have an `IService` and `ServiceImpl` for Spring DI. | Producer interfaces couple packages, bloat method contracts, and defeat Go's implicit structural duck typing. | Return concrete structs from providers. Let consumers define small (1–2 method) interfaces only where needed. |
+| **5** | **Pointers to Reference Types** | Pass-by-value copies objects, so use pointers (`*[]T`, `*map[K]V`) for collections. | Slices, maps, and channels are already lightweight 24-byte headers or internal pointers. Pointer-to-map adds useless indirection and awkward syntax. | Pass slices, maps, and channels directly by value. |
+| **6** | **Panic as Flow Control** | Exceptions are thrown for business validation (`throw new IllegalArgumentException()`). | `panic()` stops goroutine execution, unwinds the stack, and crashes the process if unhandled. It is not an exception mechanism. | Errors are values. Return `(T, error)` for business failures; reserve `panic()` strictly for unrecoverable bugs (programmer error). |
+| **7** | **Slice Memory Retention** | `new ArrayList<>(list.subList(0, 2))` vs older Java 6 `substring` leak. | Sub-slicing `hugeArray[:4]` creates a slice header pointing to the original backing array, pinning megabytes/gigabytes in RAM. | Allocate a new small slice and copy only the needed elements: `small := make([]T, 4); copy(small, huge[:4])`. |
+| **8** | **Slice Growth Without Preallocation** | `new ArrayList<>()` resizes automatically with negligible relative overhead in JVM. | Appending in a loop without capacity triggers repeated heap reallocations, memory copies, and GC pressure. | Preallocate capacity when known: `make([]T, 0, capacity)`. |
+| **9** | **Unsynchronized Map Access** | `HashMap` isn't thread-safe, but concurrent access rarely crashes the JVM process. | The Go runtime detects concurrent map read/write and immediately terminates the process with a fatal, unrecoverable crash! | Synchronize with `sync.RWMutex`, `sync.Mutex`, or use `sync.Map`. |
+| **10** | **Variable Shadowing of `err`** | Java compiler rejects duplicate local variable declarations in same scope. | The `:=` operator inside `if` or `for` declares a *new* local `err`, leaving the outer return `err` untouched and `nil`. | Use `=` assignment when setting existing outer variables, or structure error propagation explicitly. |
+
+---
 
 ## 🧪 Running Tests
 

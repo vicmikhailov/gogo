@@ -705,4 +705,8 @@ func RunPatternsDemo() {
 	fmt.Printf("   Client 2: host=%s, timeout=%v, retry=%d\n", c2.host, c2.timeout, c2.retry)
 
 	fmt.Println("--- GoF Design Patterns Demo End ---")
+
+	// 12. Go Antipatterns (for Java Developers)
+	fmt.Println()
+	RunAntipatternsDemo()
 }

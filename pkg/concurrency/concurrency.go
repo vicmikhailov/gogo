@@ -21,44 +21,53 @@ import (
 	"time"
 )
 
-// contextKey is a custom type for context keys to avoid collisions.
+// contextKey is a custom type for context keys to prevent namespace collisions across packages.
 type contextKey string
 
 const requestIDKey contextKey = "request-id"
 
-// RunConcurrencyDemo showcases Go's concurrency model.
+// RunConcurrencyDemo showcases Go's core concurrency primitives and patterns.
 func RunConcurrencyDemo() {
 	fmt.Println("--- Concurrency Demo ---")
 
 	// 1. Simple Goroutine with Channels
 	// Java equivalent: Creating a thread and using a SynchronousQueue.
+	// - make(chan string): creates an unbuffered channel (synchronous; sender blocks until receiver is ready).
+	// - go func(): starts a new concurrent goroutine.
+	// - ch <- data: sends data into the channel.
+	// - <-ch: receives data from the channel (blocks until data arrives).
 	fmt.Println("1. Simple Goroutine and Channels:")
-	ch := make(chan string) // Unbuffered channel (blocking until both sides are ready)
-	go func() {             // The 'go' keyword starts a new goroutine asynchronously
+	ch := make(chan string)
+	go func() {
 		time.Sleep(100 * time.Millisecond)
-		ch <- "Hello from a goroutine!" // Send data into the channel
+		ch <- "Hello from a goroutine!"
 	}()
-	msg := <-ch // Receive data from the channel (blocks until data is available)
+	msg := <-ch
 	fmt.Println("   Received:", msg)
 
-	// 2. sync.WaitGroup
-	// Java equivalent: java.util.concurrent.CountDownLatch(3)
+	// 2. sync.WaitGroup for multiple workers
+	// Java equivalent: java.util.concurrent.CountDownLatch(3).
+	// - wg.Add(1): increments the task counter before launching each goroutine.
+	// - defer wg.Done(): decrements the counter when the worker completes (like a finally block).
+	// - wg.Wait(): blocks until the counter reaches zero.
 	fmt.Println("2. sync.WaitGroup for multiple workers:")
 	var wg sync.WaitGroup
 	for i := 1; i <= 3; i++ {
-		wg.Add(1) // Increment the counter
+		wg.Add(1)
 		go func(id int) {
-			defer wg.Done() // Decrement the counter when the function exits (like finally block)
+			defer wg.Done()
 			fmt.Printf("   Worker %d is working...\n", id)
 			time.Sleep(50 * time.Millisecond)
 		}(i)
 	}
-	wg.Wait() // Block until the counter reaches zero
+	wg.Wait()
 	fmt.Println("   All workers finished.")
 
-	// 3. Select statement and Timers
-	// Java equivalent: Complex logic with `Selector` or polling multiple `BlockingQueue`s.
-	// `select` lets a goroutine wait on multiple communication operations.
+	// 3. Select statement with timeout
+	// Java equivalent: Complex polling with `Selector` or multiple `BlockingQueue.poll(timeout)`.
+	// - `select` lets a goroutine wait simultaneously on multiple channel operations.
+	// - case res := <-c1: triggers if c1 receives data.
+	// - case <-time.After(...): triggers if the timeout duration expires first.
 	fmt.Println("3. Select statement with timeout:")
 	c1 := make(chan string)
 	go func() {
@@ -67,18 +76,21 @@ func RunConcurrencyDemo() {
 	}()
 
 	select {
-	case res := <-c1: // Triggers if c1 receives a value
+	case res := <-c1:
 		fmt.Println("   Received:", res)
-	case <-time.After(100 * time.Millisecond): // Triggers if 100ms passes first
+	case <-time.After(100 * time.Millisecond):
 		fmt.Println("   Timeout reached (as expected)!")
 	}
 
 	// 4. Context for cancellation
 	// Java equivalent: `Thread.interrupt()` or `ExecutorService.shutdownNow()`.
 	// Go uses `context.Context` to propagate cancellation signals down the call tree.
+	// - context.WithTimeout: creates a context with an automatic deadline.
+	// - defer cancel(): releases timer resources associated with the context.
+	// - <-ctx.Done(): receives a signal when cancelled or timed out; ctx.Err() provides the reason.
 	fmt.Println("4. Context for cancellation:")
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
-	defer cancel() // Good practice: always call cancel to release resources
+	defer cancel()
 
 	finished := make(chan bool)
 	go func(ctx context.Context) {
@@ -86,7 +98,7 @@ func RunConcurrencyDemo() {
 		case <-time.After(500 * time.Millisecond):
 			fmt.Println("   Worker finished on its own (should not happen)")
 			finished <- true
-		case <-ctx.Done(): // Triggers when the context is cancelled or times out
+		case <-ctx.Done():
 			fmt.Println("   Worker received cancellation signal:", ctx.Err())
 			finished <- false
 		}
@@ -95,43 +107,41 @@ func RunConcurrencyDemo() {
 	<-finished
 
 	// 5. Context Value Propagation
-	// Java equivalent: ThreadLocal.
-	// Context can also carry request-scoped values (like IDs, tokens) through the stack.
+	// Java equivalent: ThreadLocal or Spring RequestContextHolder.
+	// Context can also carry request-scoped metadata (like request IDs or auth tokens) down the stack.
 	fmt.Println("5. Context Value Propagation:")
 	ctxValue := context.WithValue(context.Background(), requestIDKey, "req-12345")
 	processRequest(ctxValue)
 
 	// 6. Worker Pool (fan-out pattern)
-	// Java equivalent: ExecutorService with a fixed thread pool.
+	// Java equivalent: ExecutorService with a fixed thread pool (Executors.newFixedThreadPool(3)).
+	// - jobs := make(chan int, 5): buffered channel holding up to 5 pending tasks without blocking.
+	// - close(jobs): signals to workers that no more jobs will be produced.
 	fmt.Println("6. Worker Pool (fan-out):")
-	jobs := make(chan int, 5) // Buffered channel with capacity 5
+	jobs := make(chan int, 5)
 	results := make(chan int, 5)
 
-	// Start 3 workers (goroutines)
 	for w := 1; w <= 3; w++ {
 		go worker(w, jobs, results)
 	}
 
-	// Send 5 jobs into the jobs channel
 	for j := 1; j <= 5; j++ {
 		jobs <- j
 	}
-	close(jobs) // Closing a channel indicates no more values will be sent
+	close(jobs)
 
-	// Collect results from the results channel
 	for a := 1; a <= 5; a++ {
 		<-results
 	}
 	fmt.Println("   All jobs completed via worker pool.")
 
-	// 7. Pipeline Pattern
-	// Java comparison: Java Streams or Reactor/RxJava.
-	// Go idiom: Connect stages using channels. Each stage is a goroutine.
+	// 7. Pipeline Pattern (generator -> square -> print)
+	// Java comparison: Java Streams (.map()) or Reactive Streams (RxJava/Project Reactor).
+	// Go idiom: Connect stages using channels where each stage runs in its own goroutine.
 	fmt.Println("7. Pipeline Pattern (generator -> square -> print):")
 	nums := gen(2, 3)
 	sq := square(nums)
 
-	// Consume the final stage of the pipeline
 	fmt.Print("   Pipeline output: ")
 	for n := range sq {
 		fmt.Printf("%d ", n)
@@ -144,11 +154,10 @@ func RunConcurrencyDemo() {
 // processRequest demonstrates extracting values from a Context.
 //
 // For a Java developer:
-//   - This is similar to extracting values from a `ThreadLocal` or a Request Attribute in Spring.
-//   - However, context is passed explicitly rather than being stored in thread-local storage.
-//   - `ctx.Value` returns `any`; we use a type assertion `v.(string)` to cast it.
+//   - Similar to extracting values from a `ThreadLocal` or a Request Attribute in Spring.
+//   - Unlike ThreadLocal, Context is passed explicitly down the call hierarchy.
+//   - `ctx.Value` returns `any`; type assertion `v.(string)` casts it safely.
 func processRequest(ctx context.Context) {
-	// ctx.Value returns any; we use a type assertion (v.(string)) to cast it.
 	if reqID, ok := ctx.Value(requestIDKey).(string); ok {
 		fmt.Printf("   Processing request with ID: %s\n", reqID)
 	} else {
@@ -156,15 +165,14 @@ func processRequest(ctx context.Context) {
 	}
 }
 
-// worker is a standard worker function that consumes from one channel and sends to another.
+// worker consumes tasks from one channel and sends results to another.
 //
 // For a Java developer:
-//   - `jobs <-chan int` is a receive-only channel (input).
-//   - `results chan<- int` is a send-only channel (output).
-//   - This provides compile-time safety for channel usage.
-//   - 'range' on a channel continues until the channel is closed.
+//   - Directional channels provide compile-time safety:
+//   - `jobs <-chan int`: receive-only channel (input).
+//   - `results chan<- int`: send-only channel (output).
+//   - `for j := range jobs` iterates until the channel is closed.
 func worker(id int, jobs <-chan int, results chan<- int) {
-	// 'range' on a channel continues until the channel is closed.
 	for j := range jobs {
 		fmt.Printf("   Worker %d started job %d\n", id, j)
 		time.Sleep(10 * time.Millisecond)
@@ -172,12 +180,11 @@ func worker(id int, jobs <-chan int, results chan<- int) {
 	}
 }
 
-// gen converts a list of integers to a channel that emits them.
-// This is the first stage of the pipeline.
+// gen converts a variable number of integers into a channel stream (generator stage).
 //
 // For a Java developer:
-// - Java equivalent: `Stream.of(nums)`.
-// - Go idiom: Functions that return a receive-only channel (`<-chan`) are often used as "generators".
+//   - Java equivalent: `Stream.of(nums)`.
+//   - Go idiom: Functions returning `<-chan T` (receive-only) act as concurrent generators.
 func gen(nums ...int) <-chan int {
 	out := make(chan int)
 	go func() {
@@ -189,11 +196,10 @@ func gen(nums ...int) <-chan int {
 	return out
 }
 
-// square receives integers from a channel and emits their squares.
-// This is the second stage of the pipeline.
+// square receives integers from an input channel, squares them, and emits to an output channel.
 //
 // For a Java developer:
-// - Java equivalent: `.map(n -> n * n)`.
+//   - Java equivalent: `.map(n -> n * n)`.
 func square(in <-chan int) <-chan int {
 	out := make(chan int)
 	go func() {
