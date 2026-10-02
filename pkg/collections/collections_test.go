@@ -37,6 +37,18 @@ func TestSetBasicOps(t *testing.T) {
 	}
 }
 
+func TestSetZeroValue(t *testing.T) {
+	var s Set[string]
+	s.Add("go")
+	if !s.Contains("go") || s.Len() != 1 {
+		t.Fatalf("zero-value set did not retain its item: %#v", s.Values())
+	}
+	s.Remove("go")
+	if s.Len() != 0 {
+		t.Fatalf("set length after remove = %d, want 0", s.Len())
+	}
+}
+
 func TestSetUnion(t *testing.T) {
 	a := NewSet(1, 2, 3)
 	b := NewSet(3, 4, 5)
@@ -113,6 +125,18 @@ func TestStack(t *testing.T) {
 	}
 }
 
+func TestStackPopClearsRemovedReference(t *testing.T) {
+	value := 42
+	var stack Stack[*int]
+	stack.Push(&value)
+	if got, ok := stack.Pop(); !ok || got != &value {
+		t.Fatalf("Pop() = (%p, %t), want (%p, true)", got, ok, &value)
+	}
+	if len(stack.items) != 0 || stack.items[:cap(stack.items)][0] != nil {
+		t.Fatal("popped reference remains in the stack backing array")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Queue tests
 // ---------------------------------------------------------------------------
@@ -148,6 +172,32 @@ func TestQueue(t *testing.T) {
 	}
 }
 
+func TestQueueCompactsAndCanBeReused(t *testing.T) {
+	var q Queue[int]
+	for i := 0; i < 8; i++ {
+		q.Enqueue(i)
+	}
+	for i := 0; i < 4; i++ {
+		if got, ok := q.Dequeue(); !ok || got != i {
+			t.Fatalf("Dequeue() = (%d, %t), want (%d, true)", got, ok, i)
+		}
+	}
+	if q.Len() != 4 || q.head != 0 {
+		t.Fatalf("queue after compaction has len=%d head=%d, want len=4 head=0", q.Len(), q.head)
+	}
+	for i := 8; i < 11; i++ {
+		q.Enqueue(i)
+	}
+	for i := 4; i < 11; i++ {
+		if got, ok := q.Dequeue(); !ok || got != i {
+			t.Fatalf("Dequeue() = (%d, %t), want (%d, true)", got, ok, i)
+		}
+	}
+	if !q.IsEmpty() || q.Len() != 0 {
+		t.Fatalf("queue should be empty after draining, got len=%d", q.Len())
+	}
+}
+
 // ---------------------------------------------------------------------------
 // OrderedMap tests
 // ---------------------------------------------------------------------------
@@ -175,6 +225,18 @@ func TestOrderedMapPreservesInsertionOrder(t *testing.T) {
 	}
 	if om.Len() != 2 {
 		t.Errorf("Expected Len 2, got %d", om.Len())
+	}
+}
+
+func TestOrderedMapZeroValue(t *testing.T) {
+	var om OrderedMap[string, int]
+	om.Put("answer", 42)
+	if value, ok := om.Get("answer"); !ok || value != 42 {
+		t.Fatalf("zero-value ordered map Get() = (%d, %t), want (42, true)", value, ok)
+	}
+	om.Delete("answer")
+	if om.Len() != 0 {
+		t.Fatalf("ordered map length after delete = %d, want 0", om.Len())
 	}
 }
 

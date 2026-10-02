@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -121,6 +122,35 @@ func TestMemoize(t *testing.T) {
 	}
 	if calls != 2 {
 		t.Errorf("Expected 2 computations after new key, got %d", calls)
+	}
+}
+
+func TestMemoizeConcurrentCalls(t *testing.T) {
+	var calls atomic.Int64
+	memoized := Memoize(func(n int) int {
+		calls.Add(1)
+		return n * n
+	})
+
+	const goroutines = 50
+	var wg sync.WaitGroup
+	results := make([]int, goroutines)
+	wg.Add(goroutines)
+	for i := range goroutines {
+		go func() {
+			defer wg.Done()
+			results[i] = memoized(i % 10)
+		}()
+	}
+	wg.Wait()
+
+	for i, result := range results {
+		if want := (i % 10) * (i % 10); result != want {
+			t.Errorf("memoized(%d) = %d, want %d", i%10, result, want)
+		}
+	}
+	if calls.Load() < 10 {
+		t.Errorf("function called %d times, want at least one call per key", calls.Load())
 	}
 }
 
@@ -242,10 +272,48 @@ func TestClamp(t *testing.T) {
 
 func TestFanOut(t *testing.T) {
 	inputs := []int{1, 2, 3, 4, 5}
-	results := FanOut(inputs, 2, func(n int) int { return n * n })
+	results, err := FanOut(inputs, 2, func(n int) int { return n * n })
+	if err != nil {
+		t.Fatalf("FanOut returned error: %v", err)
+	}
 	expected := []int{1, 4, 9, 16, 25}
 	if !reflect.DeepEqual(results, expected) {
 		t.Errorf("Expected %v, got %v", expected, results)
+	}
+}
+
+func TestFanOutRejectsInvalidArguments(t *testing.T) {
+	if _, err := FanOut([]int{1}, 0, func(n int) int { return n }); err == nil {
+		t.Error("FanOut should reject a non-positive worker count")
+	}
+	if _, err := FanOut[int, int]([]int{1}, 1, nil); err == nil {
+		t.Error("FanOut should reject a nil function")
+	}
+}
+
+func TestFanOutRespectsWorkerLimit(t *testing.T) {
+	var mu sync.Mutex
+	active, peak := 0, 0
+	_, err := FanOut(make([]int, 30), 3, func(int) int {
+		mu.Lock()
+		active++
+		if active > peak {
+			peak = active
+		}
+		mu.Unlock()
+
+		time.Sleep(time.Millisecond)
+
+		mu.Lock()
+		active--
+		mu.Unlock()
+		return 0
+	})
+	if err != nil {
+		t.Fatalf("FanOut returned error: %v", err)
+	}
+	if peak > 3 {
+		t.Fatalf("peak concurrent calls = %d, want at most 3", peak)
 	}
 }
 

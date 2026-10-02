@@ -26,7 +26,7 @@ import (
 //   - Go doesn't have a built-in `Set`. The idiomatic implementation is `map[T]struct{}`.
 //   - An empty struct `struct{}` takes zero bytes of memory.
 //   - The `comparable` constraint ensures elements can be used as map keys.
-//   - In Go, maps are reference types (pointers to internal runtime structures).
+//   - The zero value is ready to read from; Add initializes storage on first write.
 type Set[T comparable] struct {
 	items map[T]struct{}
 }
@@ -45,6 +45,9 @@ func NewSet[T comparable](items ...T) *Set[T] {
 // Add inserts an item into the set.
 // Java equivalent: `set.add(item)`
 func (s *Set[T]) Add(item T) {
+	if s.items == nil {
+		s.items = make(map[T]struct{})
+	}
 	s.items[item] = struct{}{}
 }
 
@@ -143,6 +146,8 @@ func (s *Stack[T]) Pop() (T, bool) {
 		return zero, false
 	}
 	item := s.items[len(s.items)-1]
+	var zero T
+	s.items[len(s.items)-1] = zero
 	s.items = s.items[:len(s.items)-1]
 	return item, true
 }
@@ -175,12 +180,15 @@ func (s *Stack[T]) IsEmpty() bool {
 // ---------------------------------------------------------------------------
 
 // Queue implements a generic FIFO (First-In-First-Out) data structure backed by a slice.
+// Dequeue is amortized O(1); consumed slots are cleared and periodically compacted.
 //
 // For a Java developer:
 //   - Comparable to Java `Queue<T>` implemented by `LinkedList` or `ArrayDeque`.
 //   - Zero-value usable: `Queue[T]{}` is ready to use immediately.
+//   - A moving head index avoids shifting the entire slice for every dequeue.
 type Queue[T any] struct {
 	items []T
+	head  int
 }
 
 // Enqueue adds an item to the end of the queue.
@@ -193,12 +201,24 @@ func (q *Queue[T]) Enqueue(item T) {
 // Returns the zero-value of T and false if the queue is empty.
 // Java equivalent: `queue.poll()`
 func (q *Queue[T]) Dequeue() (T, bool) {
-	if len(q.items) == 0 {
+	if q.head == len(q.items) {
 		var zero T
 		return zero, false
 	}
-	item := q.items[0]
-	q.items = q.items[1:]
+	item := q.items[q.head]
+	var zero T
+	q.items[q.head] = zero
+	q.head++
+
+	if q.head == len(q.items) {
+		q.items = nil
+		q.head = 0
+	} else if q.head >= len(q.items)/2 {
+		remaining := copy(q.items, q.items[q.head:])
+		clear(q.items[remaining:])
+		q.items = q.items[:remaining]
+		q.head = 0
+	}
 	return item, true
 }
 
@@ -206,23 +226,23 @@ func (q *Queue[T]) Dequeue() (T, bool) {
 // Returns the zero-value of T and false if the queue is empty.
 // Java equivalent: `queue.peek()`
 func (q *Queue[T]) Peek() (T, bool) {
-	if len(q.items) == 0 {
+	if q.head == len(q.items) {
 		var zero T
 		return zero, false
 	}
-	return q.items[0], true
+	return q.items[q.head], true
 }
 
 // Len returns the number of elements in the queue.
 // Java equivalent: `queue.size()`
 func (q *Queue[T]) Len() int {
-	return len(q.items)
+	return len(q.items) - q.head
 }
 
 // IsEmpty reports whether the queue contains no elements.
 // Java equivalent: `queue.isEmpty()`
 func (q *Queue[T]) IsEmpty() bool {
-	return len(q.items) == 0
+	return q.head == len(q.items)
 }
 
 // ---------------------------------------------------------------------------
@@ -233,7 +253,7 @@ func (q *Queue[T]) IsEmpty() bool {
 //
 // For a Java developer:
 //   - Comparable to Java `LinkedHashMap<K, V>`.
-//   - Standard Go maps do not preserve insertion order (iteration order is deliberately randomized).
+//   - Standard Go maps do not specify iteration order.
 //   - We maintain a separate `keys` slice to preserve insertion order.
 type OrderedMap[K comparable, V any] struct {
 	keys   []K
@@ -249,6 +269,9 @@ func NewOrderedMap[K comparable, V any]() *OrderedMap[K, V] {
 // Put adds or updates a key-value pair. New keys are appended; existing keys keep their position.
 // Java equivalent: `map.put(key, value)`
 func (m *OrderedMap[K, V]) Put(key K, value V) {
+	if m.values == nil {
+		m.values = make(map[K]V)
+	}
 	if _, exists := m.values[key]; !exists {
 		m.keys = append(m.keys, key)
 	}
@@ -273,8 +296,10 @@ func (m *OrderedMap[K, V]) Delete(key K) {
 	delete(m.values, key)
 	for i, k := range m.keys {
 		if k == key {
-			// Slice removal trick: append elements before index i with elements after index i
-			m.keys = append(m.keys[:i], m.keys[i+1:]...)
+			copy(m.keys[i:], m.keys[i+1:])
+			var zero K
+			m.keys[len(m.keys)-1] = zero
+			m.keys = m.keys[:len(m.keys)-1]
 			break
 		}
 	}

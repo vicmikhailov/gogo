@@ -44,11 +44,17 @@ func TestNewNotifier(t *testing.T) {
 		{"slack", "dev", "[Slack"},
 	}
 	for _, tc := range cases {
-		n := NewNotifier(tc.nType, tc.dest)
+		n, err := NewNotifier(tc.nType, tc.dest)
+		if err != nil {
+			t.Fatalf("NewNotifier(%q) returned error: %v", tc.nType, err)
+		}
 		out := n.Send("hi")
 		if !strings.HasPrefix(out, tc.wantPrefix) {
 			t.Errorf("NewNotifier(%q).Send() = %q, want prefix %q", tc.nType, out, tc.wantPrefix)
 		}
+	}
+	if _, err := NewNotifier("pager", "on-call"); err == nil {
+		t.Error("NewNotifier with an unknown type should return an error")
 	}
 }
 
@@ -117,6 +123,24 @@ func TestEventBusPubSub(t *testing.T) {
 	}
 }
 
+func TestEventBusListenerCanSubscribeDuringPublish(t *testing.T) {
+	bus := NewEventBus()
+	subscribedDuringPublish := false
+	calls := 0
+	bus.Subscribe("test", func(string, interface{}) {
+		if !subscribedDuringPublish {
+			subscribedDuringPublish = true
+			bus.Subscribe("test", func(string, interface{}) { calls++ })
+		}
+	})
+
+	bus.Publish("test", nil)
+	bus.Publish("test", nil)
+	if calls != 1 {
+		t.Fatalf("listener added during publish ran %d times, want 1", calls)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Decorator
 // ---------------------------------------------------------------------------
@@ -146,6 +170,19 @@ func TestIntRange(t *testing.T) {
 	expected := []int{3, 4, 5, 6}
 	if !reflect.DeepEqual(collected, expected) {
 		t.Errorf("Expected %v, got %v", expected, collected)
+	}
+}
+
+func TestIntRangeSeqStopsWhenConsumerBreaks(t *testing.T) {
+	var collected []int
+	for value := range IntRangeSeq(0, 10) {
+		collected = append(collected, value)
+		if value == 2 {
+			break
+		}
+	}
+	if want := []int{0, 1, 2}; !reflect.DeepEqual(collected, want) {
+		t.Fatalf("iterator values = %v, want %v", collected, want)
 	}
 }
 

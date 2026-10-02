@@ -12,6 +12,7 @@ package patterns
 
 import (
 	"fmt"
+	"iter"
 	"strings"
 	"sync"
 	"time"
@@ -26,11 +27,21 @@ import (
 // For a Java developer:
 // - Java equivalent: enum Singleton { INSTANCE; } or Double-Checked Locking.
 // - Go idiom: Use `sync.Once` to ensure a piece of code runs exactly once.
+// - Unexported fields and read-only methods keep callers from mutating shared config unsafely.
 type AppConfig struct {
-	AppName   string
-	Version   string
-	DebugMode bool
+	appName   string
+	version   string
+	debugMode bool
 }
+
+// AppName returns the configured application name.
+func (c *AppConfig) AppName() string { return c.appName }
+
+// Version returns the configured application version.
+func (c *AppConfig) Version() string { return c.version }
+
+// DebugMode reports whether debug mode is enabled.
+func (c *AppConfig) DebugMode() bool { return c.debugMode }
 
 var (
 	appConfigInstance *AppConfig
@@ -42,9 +53,9 @@ var (
 func GetAppConfig() *AppConfig {
 	appConfigOnce.Do(func() {
 		appConfigInstance = &AppConfig{
-			AppName:   "GoShowcase",
-			Version:   "1.0.0",
-			DebugMode: false,
+			appName:   "GoShowcase",
+			version:   "1.0.0",
+			debugMode: false,
 		}
 	})
 	return appConfigInstance
@@ -79,16 +90,16 @@ func (s slackNotifier) Send(msg string) string {
 
 // NewNotifier is a factory method that returns the correct Notifier by type name.
 // Java equivalent: `public static Notifier createNotifier(String type, String destination)`
-func NewNotifier(nType, destination string) Notifier {
+func NewNotifier(nType, destination string) (Notifier, error) {
 	switch nType {
 	case "email":
-		return emailNotifier{address: destination}
+		return emailNotifier{address: destination}, nil
 	case "sms":
-		return smsNotifier{phone: destination}
+		return smsNotifier{phone: destination}, nil
 	case "slack":
-		return slackNotifier{channel: destination}
+		return slackNotifier{channel: destination}, nil
 	default:
-		return emailNotifier{address: destination}
+		return nil, fmt.Errorf("unknown notifier type %q", nType)
 	}
 }
 
@@ -258,7 +269,7 @@ func (s *Sorter) Sort(data []int) []int {
 // For a Java developer:
 // - Java equivalent: PropertyChangeListener or Spring ApplicationEventPublisher.
 // - Go idiom: Use a slice of functions (listeners) and a mutex for safety.
-type EventListener func(eventName string, data interface{})
+type EventListener func(eventName string, data any)
 
 // EventBus is a simple publish-subscribe system (comparable to Java EventBus / listeners).
 //
@@ -282,12 +293,16 @@ func (eb *EventBus) Subscribe(event string, listener EventListener) {
 	eb.listeners[event] = append(eb.listeners[event], listener)
 }
 
-// Publish fires an event, notifying all registered listeners.
+// Publish fires an event, notifying a snapshot of registered listeners.
 // Java equivalent: `eventBus.post(event)`
-func (eb *EventBus) Publish(event string, data interface{}) {
+// Callbacks run without the bus lock and may run concurrently when Publish is called concurrently.
+// Callers should treat data as immutable or synchronize mutation themselves.
+func (eb *EventBus) Publish(event string, data any) {
 	eb.mu.RLock()
-	defer eb.mu.RUnlock()
-	for _, listener := range eb.listeners[event] {
+	listeners := append([]EventListener(nil), eb.listeners[event]...)
+	eb.mu.RUnlock()
+
+	for _, listener := range listeners {
 		listener(event, data)
 	}
 }
@@ -344,6 +359,7 @@ func (d bracketDecorator) Transform(input string) string {
 // For a Java developer:
 // - Java equivalent: `IntStream.range(start, end).iterator()`.
 // - Go idiom: Use a channel as an iterator. The `for range` loop makes it feel natural.
+// - The consumer must drain the channel or arrange cancellation; otherwise the producer may block.
 func IntRange(start, end int) <-chan int {
 	ch := make(chan int)
 	go func() {
@@ -353,6 +369,21 @@ func IntRange(start, end int) <-chan int {
 		}
 	}()
 	return ch
+}
+
+// IntRangeSeq iterates over integers in [start, end) without creating a goroutine.
+//
+// For a Java developer:
+//   - Go 1.23's range-over-function iterators resemble a lightweight Iterable.
+//   - Unlike a channel-backed iterator, stopping early does not leave a producer goroutine blocked.
+func IntRangeSeq(start, end int) iter.Seq[int] {
+	return func(yield func(int) bool) {
+		for i := start; i < end; i++ {
+			if !yield(i) {
+				return
+			}
+		}
+	}
 }
 
 // Fibonacci returns a closure-based iterator that yields Fibonacci numbers.
@@ -601,14 +632,22 @@ func RunPatternsDemo() {
 	fmt.Println("1. Singleton (sync.Once):")
 	cfg1 := GetAppConfig()
 	cfg2 := GetAppConfig()
-	fmt.Printf("   Same instance? %v (AppName: %s)\n", cfg1 == cfg2, cfg1.AppName)
+	fmt.Printf("   Same instance? %v (AppName: %s)\n", cfg1 == cfg2, cfg1.AppName())
 
 	// 2. Factory Method
 	fmt.Println("2. Factory Method:")
-	notifiers := []Notifier{
-		NewNotifier("email", "dev@example.com"),
-		NewNotifier("sms", "+1234567890"),
-		NewNotifier("slack", "engineering"),
+	notifiers := make([]Notifier, 0, 3)
+	for _, destination := range []struct{ kind, address string }{
+		{"email", "dev@example.com"},
+		{"sms", "+1234567890"},
+		{"slack", "engineering"},
+	} {
+		notifier, err := NewNotifier(destination.kind, destination.address)
+		if err != nil {
+			fmt.Printf("   Could not create notifier: %v\n", err)
+			continue
+		}
+		notifiers = append(notifiers, notifier)
 	}
 	for _, n := range notifiers {
 		fmt.Printf("   %s\n", n.Send("Build succeeded"))
@@ -663,6 +702,14 @@ func RunPatternsDemo() {
 	fmt.Print("   Range [0,5): ")
 	for val := range IntRange(0, 5) {
 		fmt.Printf("%d ", val)
+	}
+	fmt.Println()
+	fmt.Print("   Range-function iterator [0,5), stopping after 2: ")
+	for val := range IntRangeSeq(0, 5) {
+		fmt.Printf("%d ", val)
+		if val == 2 {
+			break
+		}
 	}
 	fmt.Println()
 	fmt.Print("   Fibonacci(10): ")

@@ -11,6 +11,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -257,12 +259,13 @@ type CustomerFinder interface {
 }
 
 // LookupCustomerName accepts the narrow interface, allowing any mock or alternative implementation.
-func LookupCustomerName(finder CustomerFinder, id string) string {
+// It propagates lookup failures rather than turning them into a success-shaped fallback.
+func LookupCustomerName(finder CustomerFinder, id string) (string, error) {
 	c, err := finder.GetCustomer(id)
 	if err != nil {
-		return "Unknown"
+		return "", fmt.Errorf("lookup customer %q: %w", id, err)
 	}
-	return c.Name
+	return c.Name, nil
 }
 
 // ===========================================================================
@@ -274,16 +277,15 @@ func LookupCustomerName(finder CustomerFinder, id string) string {
 // a big collection to a method, I should pass a reference to avoid copying it."
 //
 // Go Trap:
-// Slices, maps, and channels in Go are ALREADY reference headers under the hood!
-// - A slice is a 24-byte struct: { pointer to array, length int, capacity int }.
-// - A map is a pointer to an internal `hmap` structure.
-// - A channel is a pointer to an internal `hchan` structure.
+// Slices, maps, and channels are descriptors/handles that refer to runtime-managed state.
+// Copying one does not deep-copy its elements, so aliases can observe mutations.
 // Passing `*map[string]int` or `*[]string` creates a redundant pointer-to-pointer,
 // forcing clumsy syntax like `(*m)["key"] = val` and confusing callers.
 //
 // Idiomatic Go:
 // Pass slices, maps, and channels by value. Modifications to map entries or slice
-// elements in-place are immediately visible to the caller.
+// elements in-place are visible through aliases. Appending may replace a slice's
+// backing array, so return the resulting slice when the caller needs its new length.
 // (Only use `*[]T` if the function needs to reallocate and reassign the caller's slice header).
 
 // UpdateMapAntipattern uses a pointer to a map (unnecessary double indirection).
@@ -372,7 +374,8 @@ func ExtractHeaderIdiomatic(largeData []byte) []byte {
 // For a Java developer:
 // In Java, `new ArrayList<>()` starts with capacity 10 and resizes.
 // In Go, growing a slice via `append` without initial capacity causes multiple heap
-// allocations, copying data each time the backing array doubles (1, 2, 4, 8, 16...).
+// allocations and copying data as the backing array grows. The growth strategy is
+// an implementation detail; do not depend on a particular capacity sequence.
 //
 // Idiomatic Go:
 // When the target size is known or can be estimated, preallocate capacity:
@@ -458,28 +461,59 @@ func (m *ThreadSafeMap) Get(key string) (string, bool) {
 // Use `=` (assignment) rather than `:=` (short declaration) when targeting an existing
 // variable in the enclosing scope, or give inner variables explicit names.
 
-// ParseCoordinatesAntipattern demonstrates variable shadowing bug.
+// ParseCoordinatesAntipattern demonstrates how a shadowed error can be discarded.
 func ParseCoordinatesAntipattern(sX, sY string) (x, y int, err error) {
 	if sX != "" {
-		// BUG: ":=" creates a NEW 'err' local to this if-block!
-		// The outer 'err' return value remains nil!
+		// BUG: ":=" creates a new block-local err. The invalid-input path
+		// never assigns the named return err, so the function reports success.
 		val, err := strconv.Atoi(sX)
-		if err != nil {
-			return 0, 0, err
+		if err == nil {
+			x = val
 		}
-		x = val
 	}
 
 	if sY != "" {
-		// Proper assignment without shadowing:
-		var val int
-		val, err = strconv.Atoi(sY)
-		if err != nil {
-			return 0, 0, err
+		val, err := strconv.Atoi(sY)
+		if err == nil {
+			y = val
 		}
-		y = val
 	}
 	return x, y, nil
+}
+
+// ParseCoordinatesIdiomatic propagates conversion errors instead of shadowing them.
+func ParseCoordinatesIdiomatic(sX, sY string) (x, y int, err error) {
+	if sX != "" {
+		x, err = strconv.Atoi(sX)
+		if err != nil {
+			return 0, 0, fmt.Errorf("parse x coordinate: %w", err)
+		}
+	}
+	if sY != "" {
+		y, err = strconv.Atoi(sY)
+		if err != nil {
+			return 0, 0, fmt.Errorf("parse y coordinate: %w", err)
+		}
+	}
+	return x, y, nil
+}
+
+// ProfileSnapshot contains mutable reference-like fields.
+type ProfileSnapshot struct {
+	Tags       []string
+	Attributes map[string]string
+}
+
+// ShallowProfileCopyAntipattern copies only the slice and map descriptors.
+func ShallowProfileCopyAntipattern(profile ProfileSnapshot) ProfileSnapshot {
+	return profile
+}
+
+// CloneProfileSnapshot copies the slice and map so mutations do not affect the source.
+func CloneProfileSnapshot(profile ProfileSnapshot) ProfileSnapshot {
+	profile.Tags = slices.Clone(profile.Tags)
+	profile.Attributes = maps.Clone(profile.Attributes)
+	return profile
 }
 
 // ===========================================================================
@@ -528,8 +562,12 @@ func RunAntipatternsDemo() {
 	// 4. Consumer-side Interface
 	fmt.Println("4. Consumer-Side Interface (Duck Typing vs Producer Interfaces):")
 	store := NewCustomerStore()
-	name := LookupCustomerName(store, "c-1")
-	fmt.Printf("   Lookup Customer: %s (Consumer defined interface 'CustomerFinder')\n", name)
+	name, err := LookupCustomerName(store, "c-1")
+	if err != nil {
+		fmt.Printf("   Customer lookup failed: %v\n", err)
+	} else {
+		fmt.Printf("   Lookup Customer: %s (Consumer defined interface 'CustomerFinder')\n", name)
+	}
 
 	// 5. Reference Types
 	fmt.Println("5. Slices and Maps are Reference Types:")
@@ -571,6 +609,27 @@ func RunAntipatternsDemo() {
 	safeMap.Set("user_1", "Alice")
 	val, _ := safeMap.Get("user_1")
 	fmt.Printf("   Retrieved synchronized value: %s\n", val)
+
+	fmt.Println("10. Error Shadowing:")
+	_, _, badErr := ParseCoordinatesAntipattern("not-a-number", "20")
+	_, _, goodErr := ParseCoordinatesIdiomatic("not-a-number", "20")
+	fmt.Printf("   Shadowed error reports failure? %t; explicit propagation reports failure? %t\n",
+		badErr != nil, goodErr != nil)
+
+	fmt.Println("11. Shallow Copies of Mutable Fields:")
+	profile := ProfileSnapshot{
+		Tags:       []string{"go"},
+		Attributes: map[string]string{"level": "senior"},
+	}
+	shallow := ShallowProfileCopyAntipattern(profile)
+	shallow.Tags[0] = "java"
+	shallow.Attributes["level"] = "staff"
+	fmt.Printf("   Shallow copy changed source too: tags=%v attributes=%v\n",
+		profile.Tags, profile.Attributes)
+	snapshot := CloneProfileSnapshot(profile)
+	snapshot.Tags[0] = "isolated"
+	snapshot.Attributes["level"] = "principal"
+	fmt.Printf("   Deep-enough clone is independent: source=%+v clone=%+v\n", profile, snapshot)
 
 	fmt.Println("--- Go Antipatterns Demo End ---")
 }

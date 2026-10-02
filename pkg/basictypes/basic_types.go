@@ -27,7 +27,7 @@ import (
 //   - Slices are views into an underlying array. When you re-slice, they share memory.
 //   - The zero-value of a slice is `nil` (like an uninitialized Java List).
 //   - There is no formal `List` interface in the standard library.
-//   - Slices are passed by value, but the value is a 24-byte header (pointer, length, capacity).
+//   - A slice is a small descriptor (backing array, length, capacity) passed by value.
 //   - Operations:
 //   - Creation: make([]T, len, cap)  (Java: new ArrayList<>(cap))
 //   - Adding:   append(slice, items) (Java: list.add(item))
@@ -78,8 +78,8 @@ func RunSliceManipulationDemo() {
 //
 // For a Java developer:
 //   - Go's `map` is a hash map (like `HashMap<K, V>`).
-//   - Iteration order is randomized to prevent code from relying on specific ordering.
-//   - Maps are reference types; passing a map to a function allows mutating the original map.
+//   - Iteration order is unspecified; sort keys when output must be deterministic.
+//   - Copying a map value shares its underlying entries, so mutations are visible through aliases.
 //   - Accessing a non-existent key returns the zero-value (0, "", nil) instead of throwing an exception or returning null.
 //   - The "comma ok" idiom (`v, ok := m[key]`) is used to test whether a key exists.
 //   - To iterate in deterministic order, extract keys into a slice and sort them first.
@@ -108,7 +108,7 @@ func RunMapManipulationDemo() {
 	delete(ages, "Bob")
 	fmt.Printf("   After delete(Bob): %v\n", ages)
 
-	// e. Iteration (Warning: Order is random!)
+	// e. Iteration (Warning: Order is unspecified!)
 	fmt.Print("   Iteration (order varies): ")
 	for name, age := range ages {
 		fmt.Printf("%s:%d ", name, age)
@@ -128,6 +128,67 @@ func RunMapManipulationDemo() {
 		fmt.Printf("%s:%d ", k, ages[k])
 	}
 	fmt.Println()
+
+	// g. A map can implement a set, and its zero-value element makes counters concise.
+	// Java equivalents: Set<String> and Map<String, Integer>.merge(key, 1, Integer::sum).
+	seen := make(map[string]struct{})
+	wordCounts := make(map[string]int)
+	for _, word := range []string{"go", "maps", "go", "sets"} {
+		seen[word] = struct{}{}
+		wordCounts[word]++
+	}
+	_, hasGo := seen["go"]
+	fmt.Printf("   Set membership: go=%t; frequency map: %v\n", hasGo, wordCounts)
+
+	// h. Nested maps model grouped data; initialize each inner map before writing.
+	teams := map[string]map[string]int{}
+	if teams["platform"] == nil {
+		teams["platform"] = make(map[string]int)
+	}
+	teams["platform"]["gophers"] = 4
+	fmt.Printf("   Nested map: %v\n", teams)
+}
+
+// RunMutabilityDemo contrasts Go's value copies with shared slice/map storage.
+//
+// For a Java developer:
+//   - Struct assignment copies fields; it does not create an alias to the original struct.
+//   - A slice is a copied descriptor (array pointer, length, capacity), so element writes
+//     are shared when descriptors refer to the same backing array.
+//   - Appending returns a possibly new descriptor; callers must use the returned slice.
+//   - A map assignment copies a descriptor to shared map storage; entry updates are visible
+//     through every copy. None of these types make concurrent mutation safe.
+func RunMutabilityDemo() {
+	fmt.Println("\n--- Mutability and Copy Semantics Demo ---")
+
+	values := make([]int, 3, 4)
+	copy(values, []int{1, 2, 3})
+	alias := values
+	alias[0] = 99
+	fmt.Printf("   Slice element mutation is shared: values=%v alias=%v\n", values, alias)
+
+	grown := append(values, 4)
+	fmt.Printf("   Append returns a new slice header: old len=%d, new=%v\n", len(values), grown)
+
+	cloned := append([]int(nil), values...)
+	cloned[0] = 7
+	fmt.Printf("   Explicit copy is independent: values=%v clone=%v\n", values, cloned)
+
+	original := struct {
+		Name string
+	}{Name: "before"}
+	valueCopy := original
+	valueCopy.Name = "value copy"
+	pointer := &original
+	pointer.Name = "pointer mutation"
+	fmt.Printf("   Struct assignment copies fields: original=%q copy=%q\n", original.Name, valueCopy.Name)
+
+	metadata := map[string]string{"owner": "platform"}
+	metadataAlias := metadata
+	metadataAlias["owner"] = "runtime"
+	fmt.Printf("   Map entry mutation is shared: %v\n", metadata)
+
+	fmt.Println("--- Mutability and Copy Semantics End ---")
 }
 
 // ---------------------------------------------------------------------------
@@ -216,28 +277,38 @@ func RunJSONDemo() {
 		Price: 19.99,
 		Tags:  []string{"toy", "mascot"},
 	}
-	jsonData, _ := json.MarshalIndent(p, "   ", "  ")
+	jsonData, err := json.MarshalIndent(p, "   ", "  ")
+	if err != nil {
+		fmt.Printf("   Could not marshal product: %v\n", err)
+		return
+	}
 	fmt.Printf("   JSON Output:\n%s\n", string(jsonData))
 
 	// b. Unmarshalling (JSON to Struct)
 	rawJSON := `{"id": 102, "name": "Go Mug", "price": 12.50}`
 	var p2 Product
-	err := json.Unmarshal([]byte(rawJSON), &p2)
-	if err == nil {
-		fmt.Printf("   Unmarshalled Struct: %+v\n", p2)
+	if err := json.Unmarshal([]byte(rawJSON), &p2); err != nil {
+		fmt.Printf("   Could not unmarshal product: %v\n", err)
+		return
 	}
+	fmt.Printf("   Unmarshalled Struct: %+v\n", p2)
 
 	// c. Arbitrary JSON (using map[string]any)
 	// Useful when the schema is dynamic or unknown (like Java Map<String, Object>).
 	var data map[string]any
-	err = json.Unmarshal([]byte(rawJSON), &data)
-	if err == nil {
-		fmt.Printf("   Map representation:  %v (Name: %v)\n", data, data["name"])
+	if err := json.Unmarshal([]byte(rawJSON), &data); err != nil {
+		fmt.Printf("   Could not unmarshal dynamic JSON: %v\n", err)
+		return
 	}
+	fmt.Printf("   Map representation:  %v (Name: %v)\n", data, data["name"])
 
 	// d. JSON with Custom Logic (omitempty)
 	pEmpty := Product{ID: 1, Name: "Invisible"}
-	emptyJSON, _ := json.Marshal(pEmpty)
+	emptyJSON, err := json.Marshal(pEmpty)
+	if err != nil {
+		fmt.Printf("   Could not marshal empty product: %v\n", err)
+		return
+	}
 	fmt.Printf("   Omitempty Tags:     %s\n", string(emptyJSON))
 }
 
@@ -246,6 +317,7 @@ func RunBasicTypesDemo() {
 	fmt.Println("--- Basic Types & Standard Library Demo ---")
 	RunSliceManipulationDemo()
 	RunMapManipulationDemo()
+	RunMutabilityDemo()
 	RunStringOperationsDemo()
 	RunJSONDemo()
 	fmt.Println("--- Basic Types & Standard Library End ---")

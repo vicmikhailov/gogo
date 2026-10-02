@@ -2,6 +2,7 @@ package concurrency
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 )
@@ -63,5 +64,54 @@ func TestContextCancellation(t *testing.T) {
 		// success
 	case <-time.After(100 * time.Millisecond):
 		t.Error("Context cancellation signal not received")
+	}
+}
+
+func TestPipelineCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	output := square(ctx, gen(ctx, 1, 2, 3, 4, 5))
+
+	select {
+	case got := <-output:
+		if got != 1 {
+			t.Fatalf("first squared value = %d, want 1", got)
+		}
+	case <-time.After(500 * time.Millisecond):
+		cancel()
+		t.Fatal("pipeline did not produce a value")
+	}
+
+	cancel()
+	done := make(chan struct{})
+	go func() {
+		for range output {
+		}
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("pipeline stages did not stop after cancellation")
+	}
+}
+
+func TestSafeCounterConcurrentUpdates(t *testing.T) {
+	var counter SafeCounter
+	const workers = 20
+	const increments = 100
+
+	var wg sync.WaitGroup
+	wg.Add(workers)
+	for i := 0; i < workers; i++ {
+		go func() {
+			defer wg.Done()
+			for j := 0; j < increments; j++ {
+				counter.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+	if got, want := counter.Value(), workers*increments; got != want {
+		t.Fatalf("counter value = %d, want %d", got, want)
 	}
 }

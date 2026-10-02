@@ -178,16 +178,25 @@ func Curry2[A, B, C any](fn func(A, B) C) func(A) func(B) C {
 
 // Memoize wraps a function with thread-safe caching of previous results.
 // Java equivalent: Caching results in a `ConcurrentHashMap` or using Guava's Cache.
+// Concurrent misses for the same key may compute fn more than once; fn runs outside the lock.
 func Memoize[K comparable, V any](fn func(K) V) func(K) V {
 	cache := make(map[K]V)
 	var mu sync.Mutex
 	return func(key K) V {
 		mu.Lock()
-		defer mu.Unlock()
 		if val, ok := cache[key]; ok {
+			mu.Unlock()
 			return val
 		}
+		mu.Unlock()
+
 		val := fn(key)
+
+		mu.Lock()
+		defer mu.Unlock()
+		if cached, ok := cache[key]; ok {
+			return cached
+		}
 		cache[key] = val
 		return val
 	}
@@ -357,40 +366,62 @@ func Clamp[T Number](value, lo, hi T) T {
 // ---------------------------------------------------------------------------
 
 // FanOut distributes work across a fixed pool of concurrent workers and preserves result ordering.
+// It returns an error if workers is not positive or fn is nil.
 //
 // For a Java developer:
 //   - Java equivalent: `ExecutorService.invokeAll()`, parallel streams, or `CompletableFuture.allOf()`.
-//   - Go idiom: A buffered channel (`sem`) acts as a counting semaphore to limit concurrency,
-//     and `sync.WaitGroup` waits for all worker goroutines to complete.
-func FanOut[T any, R any](items []T, workers int, fn func(T) R) []R {
+//   - Go idiom: A jobs channel feeds a bounded number of worker goroutines, and
+//     `sync.WaitGroup` waits for every worker to complete.
+func FanOut[T any, R any](items []T, workers int, fn func(T) R) ([]R, error) {
+	if workers <= 0 {
+		return nil, fmt.Errorf("worker count must be positive")
+	}
+	if fn == nil {
+		return nil, fmt.Errorf("fan-out function must not be nil")
+	}
+	if len(items) == 0 {
+		return []R{}, nil
+	}
+	if workers > len(items) {
+		workers = len(items)
+	}
+
 	type indexed struct {
+		idx   int
+		value T
+	}
+	type indexedResult struct {
 		idx    int
 		result R
 	}
-	ch := make(chan indexed, len(items))
-	sem := make(chan struct{}, workers)
+	jobs := make(chan indexed, len(items))
+	results := make(chan indexedResult, len(items))
 
 	var wg sync.WaitGroup
-	for i, item := range items {
+	for i := 0; i < workers; i++ {
 		wg.Add(1)
-		go func(idx int, val T) {
+		go func() {
 			defer wg.Done()
-			sem <- struct{}{}
-			result := fn(val)
-			<-sem
-			ch <- indexed{idx, result}
-		}(i, item)
+			for job := range jobs {
+				results <- indexedResult{idx: job.idx, result: fn(job.value)}
+			}
+		}()
 	}
+
+	for i, item := range items {
+		jobs <- indexed{idx: i, value: item}
+	}
+	close(jobs)
 	go func() {
 		wg.Wait()
-		close(ch)
+		close(results)
 	}()
 
-	results := make([]R, len(items))
-	for r := range ch {
-		results[r.idx] = r.result
+	ordered := make([]R, len(items))
+	for result := range results {
+		ordered[result.idx] = result.result
 	}
-	return results
+	return ordered, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -703,14 +734,22 @@ func RunAdvancedDemo() {
 	// 7. Concurrent fan-out
 	fmt.Println("7. Concurrent fan-out (≈ ExecutorService):")
 	inputs := []int{1, 2, 3, 4, 5, 6, 7, 8}
-	squares := FanOut(inputs, 3, func(n int) int { return n * n })
-	fmt.Printf("   FanOut squares: %v\n", squares)
+	squares, err := FanOut(inputs, 3, func(n int) int { return n * n })
+	if err != nil {
+		fmt.Printf("   FanOut failed: %v\n", err)
+	} else {
+		fmt.Printf("   FanOut squares: %v\n", squares)
+	}
 
 	// 8. Struct Tags and JSON
 	fmt.Println("8. Struct Tags and JSON (common in REST APIs):")
 	p := PersonWithTags{FirstName: "John", LastName: "Doe", Age: 30, Secret: "password123"}
-	data, _ := json.MarshalIndent(p, "   ", "  ")
-	fmt.Printf("   Marshaled: %s\n", string(data))
+	data, err := json.MarshalIndent(p, "   ", "  ")
+	if err != nil {
+		fmt.Printf("   Could not marshal person: %v\n", err)
+	} else {
+		fmt.Printf("   Marshaled: %s\n", string(data))
+	}
 	fmt.Println("   (Note: 'Secret' is ignored and 'Age' would be omitted if it were zero)")
 
 	// 9. Embed (Go 1.16+)
@@ -823,12 +862,13 @@ func RunJavaDeveloperFAQ() {
 	// Java-ism: Passing everything as a pointer (*T) because Java objects are references.
 	// Go way: Pass by value (T) by default. Use pointers ONLY if you need to:
 	// 1. Mutate the original object.
-	// 2. Avoid copying a VERY large struct (usually > 64 bytes).
+	// 2. Avoid copying a large struct when measurement or API semantics justify it.
 	// 3. Represent 'nil' for an optional value.
 	fmt.Println("   - Pointers: Use values by default; use pointers only when mutation or size matters.")
 
 	// f. Records vs Structs
-	// Java 14+ Records are immutable by default. Go Structs are mutable unless you use a value receiver.
+	// Records are shallowly immutable; Go structs can expose mutable fields. A value
+	// receiver copies the receiver but does not make referenced fields immutable.
 	u := UserRecord{"gopher", "go@golang.org"}
 	fmt.Printf("   - Record-like Struct: %+v\n", u)
 
@@ -838,8 +878,8 @@ func RunJavaDeveloperFAQ() {
 	fmt.Println("   - Annotations: Use Struct Tags for metadata (Runtime) and go:generate (Compile-time).")
 
 	// h. Threads vs Goroutines
-	// Goroutines are much cheaper. You can run 100k+ goroutines on a laptop.
-	fmt.Println("   - Threads: Java Threads are heavy (~1MB stack); Go Goroutines are light (~2KB).")
+	// The runtime schedules goroutines onto OS threads; cost varies with workload and runtime version.
+	fmt.Println("   - Threads: Goroutines are lightweight tasks scheduled by the Go runtime onto OS threads.")
 
 	// i. No Magic (AOP, Annotations, Dependency Injection)
 	// Java-ism: Relying on reflection/proxies for business logic (e.g. @Transactional).
@@ -871,6 +911,6 @@ func RunBuildSystemDemo() {
 	// 4. Deployment
 	fmt.Println("   4. Deployment:")
 	fmt.Println("      - Java: Usually requires a JRE and often an App Server (Tomcat/Jetty) for WARs.")
-	fmt.Println("      - Go: Produces a single, statically-linked binary (≈ a Fat JAR with no JVM requirement).")
+	fmt.Println("      - Go: Produces a native executable; dynamic system-library dependencies may still apply.")
 	fmt.Println("      - Binary is cross-compiled easily: GOOS=linux GOARCH=amd64 go build.")
 }

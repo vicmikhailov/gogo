@@ -105,21 +105,21 @@ func (m *mockCustomerFinder) GetCustomer(id string) (*Customer, error) {
 func TestConsumerSideInterface(t *testing.T) {
 	// Concrete repository
 	store := NewCustomerStore()
-	name := LookupCustomerName(store, "c-1")
-	if name != "Acme Corp" {
+	name, err := LookupCustomerName(store, "c-1")
+	if err != nil || name != "Acme Corp" {
 		t.Errorf("Expected 'Acme Corp', got %q", name)
 	}
 
 	// Mock repository satisfies the consumer's CustomerFinder interface seamlessly
 	mock := &mockCustomerFinder{mockName: "Mock Enterprise"}
-	mockName := LookupCustomerName(mock, "mock-1")
-	if mockName != "Mock Enterprise" {
+	mockName, err := LookupCustomerName(mock, "mock-1")
+	if err != nil || mockName != "Mock Enterprise" {
 		t.Errorf("Expected 'Mock Enterprise', got %q", mockName)
 	}
 
-	unknown := LookupCustomerName(mock, "unknown-id")
-	if unknown != "Unknown" {
-		t.Errorf("Expected 'Unknown', got %q", unknown)
+	_, err = LookupCustomerName(mock, "unknown-id")
+	if err == nil {
+		t.Error("Expected lookup error for unknown customer")
 	}
 }
 
@@ -245,9 +245,44 @@ func TestVariableShadowing(t *testing.T) {
 		t.Errorf("Expected (10, 20, nil), got (%d, %d, %v)", x, y, err)
 	}
 
-	// Invalid X: returned error comes from the inner block directly in this case
-	_, _, errBad := ParseCoordinatesAntipattern("invalid", "20")
-	if errBad == nil {
-		t.Error("Expected error on invalid X coordinate")
+	// The block-local err is discarded, so the antipattern incorrectly reports success.
+	x, y, err = ParseCoordinatesAntipattern("invalid", "20")
+	if err != nil || x != 0 || y != 20 {
+		t.Errorf("Antipattern should hide the invalid X error, got (%d, %d, %v)", x, y, err)
+	}
+
+	_, _, err = ParseCoordinatesIdiomatic("invalid", "20")
+	if err == nil {
+		t.Error("Idiomatic parser should return an error for an invalid X coordinate")
+	}
+
+	x, y, err = ParseCoordinatesIdiomatic("10", "20")
+	if err != nil || x != 10 || y != 20 {
+		t.Errorf("Idiomatic parser = (%d, %d, %v), want (10, 20, nil)", x, y, err)
+	}
+}
+
+func TestShallowCopyAndCloneOfMutableFields(t *testing.T) {
+	profile := ProfileSnapshot{
+		Tags:       []string{"go"},
+		Attributes: map[string]string{"level": "senior"},
+	}
+
+	shallow := ShallowProfileCopyAntipattern(profile)
+	shallow.Tags[0] = "java"
+	shallow.Attributes["level"] = "staff"
+	if profile.Tags[0] != "java" || profile.Attributes["level"] != "staff" {
+		t.Fatal("shallow copy should share the slice backing array and map entries")
+	}
+
+	clone := CloneProfileSnapshot(profile)
+	clone.Tags[0] = "rust"
+	clone.Attributes["level"] = "principal"
+	if profile.Tags[0] != "java" || profile.Attributes["level"] != "staff" {
+		t.Fatal("clone mutations should not affect the original profile")
+	}
+
+	if got := CloneProfileSnapshot(ProfileSnapshot{}); got.Tags != nil || got.Attributes != nil {
+		t.Fatal("cloning nil fields should preserve nil")
 	}
 }

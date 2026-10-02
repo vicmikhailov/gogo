@@ -1,8 +1,8 @@
 // Package concurrency showcases Go's concurrency model.
 //
 // For a Java developer:
-//   - Goroutines (`go func()`) are NOT OS threads. They are "green threads" multiplexed
-//     onto a small number of OS threads. They use ~2KB of stack space vs ~1MB in Java.
+//   - Goroutines (`go func()`) are lightweight concurrent tasks scheduled by the Go runtime
+//     onto OS threads. Their stacks grow as needed; do not rely on fixed size comparisons.
 //   - Channels (`chan`) are the primary way to communicate between goroutines.
 //     "Don't communicate by sharing memory; share memory by communicating."
 //   - Java-ism to avoid: Using `sync.Mutex` for everything. While Go has Mutexes,
@@ -69,7 +69,8 @@ func RunConcurrencyDemo() {
 	// - case res := <-c1: triggers if c1 receives data.
 	// - case <-time.After(...): triggers if the timeout duration expires first.
 	fmt.Println("3. Select statement with timeout:")
-	c1 := make(chan string)
+	// A single buffered slot lets the worker finish even if the timeout wins.
+	c1 := make(chan string, 1)
 	go func() {
 		time.Sleep(200 * time.Millisecond)
 		c1 <- "Result 1"
@@ -122,7 +123,11 @@ func RunConcurrencyDemo() {
 	results := make(chan int, 5)
 
 	for w := 1; w <= 3; w++ {
-		go worker(w, jobs, results)
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			worker(id, jobs, results)
+		}(w)
 	}
 
 	for j := 1; j <= 5; j++ {
@@ -133,14 +138,17 @@ func RunConcurrencyDemo() {
 	for a := 1; a <= 5; a++ {
 		<-results
 	}
+	wg.Wait()
 	fmt.Println("   All jobs completed via worker pool.")
 
 	// 7. Pipeline Pattern (generator -> square -> print)
 	// Java comparison: Java Streams (.map()) or Reactive Streams (RxJava/Project Reactor).
-	// Go idiom: Connect stages using channels where each stage runs in its own goroutine.
+	// Go idiom: Connect stages using channels; context cancellation lets stages stop early.
 	fmt.Println("7. Pipeline Pattern (generator -> square -> print):")
-	nums := gen(2, 3)
-	sq := square(nums)
+	pipelineCtx, stopPipeline := context.WithCancel(context.Background())
+	defer stopPipeline()
+	nums := gen(pipelineCtx, 2, 3)
+	sq := square(pipelineCtx, nums)
 
 	fmt.Print("   Pipeline output: ")
 	for n := range sq {
@@ -148,7 +156,46 @@ func RunConcurrencyDemo() {
 	}
 	fmt.Println("\n   Pipeline completed.")
 
+	fmt.Println("8. Shared mutable state (mutex-protected counter):")
+	var counter SafeCounter
+	var counterWorkers sync.WaitGroup
+	for i := 0; i < 3; i++ {
+		counterWorkers.Add(1)
+		go func() {
+			defer counterWorkers.Done()
+			for j := 0; j < 100; j++ {
+				counter.Add(1)
+			}
+		}()
+	}
+	counterWorkers.Wait()
+	fmt.Printf("   Three goroutines safely updated one counter: %d\n", counter.Value())
+
 	fmt.Println("--- Concurrency Demo End ---")
+}
+
+// SafeCounter protects shared mutable state with a mutex.
+//
+// For a Java developer:
+//   - This is similar to guarding a field with synchronized methods or a Lock.
+//   - A mutex protects the data invariant; it does not make unrelated state safe.
+type SafeCounter struct {
+	mu    sync.Mutex
+	value int
+}
+
+// Add increments the counter by delta.
+func (c *SafeCounter) Add(delta int) {
+	c.mu.Lock()
+	c.value += delta
+	c.mu.Unlock()
+}
+
+// Value returns the counter value under the same lock used by writers.
+func (c *SafeCounter) Value() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.value
 }
 
 // processRequest demonstrates extracting values from a Context.
@@ -185,13 +232,17 @@ func worker(id int, jobs <-chan int, results chan<- int) {
 // For a Java developer:
 //   - Java equivalent: `Stream.of(nums)`.
 //   - Go idiom: Functions returning `<-chan T` (receive-only) act as concurrent generators.
-func gen(nums ...int) <-chan int {
+func gen(ctx context.Context, nums ...int) <-chan int {
 	out := make(chan int)
 	go func() {
+		defer close(out)
 		for _, n := range nums {
-			out <- n
+			select {
+			case out <- n:
+			case <-ctx.Done():
+				return
+			}
 		}
-		close(out)
 	}()
 	return out
 }
@@ -200,13 +251,25 @@ func gen(nums ...int) <-chan int {
 //
 // For a Java developer:
 //   - Java equivalent: `.map(n -> n * n)`.
-func square(in <-chan int) <-chan int {
+func square(ctx context.Context, in <-chan int) <-chan int {
 	out := make(chan int)
 	go func() {
-		for n := range in {
-			out <- n * n
+		defer close(out)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case n, ok := <-in:
+				if !ok {
+					return
+				}
+				select {
+				case out <- n * n:
+				case <-ctx.Done():
+					return
+				}
+			}
 		}
-		close(out)
 	}()
 	return out
 }
