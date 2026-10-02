@@ -118,6 +118,8 @@ func RunConcurrencyDemo() {
 	// Java equivalent: ExecutorService with a fixed thread pool (Executors.newFixedThreadPool(3)).
 	// - jobs := make(chan int, 5): buffered channel holding up to 5 pending tasks without blocking.
 	// - close(jobs): signals to workers that no more jobs will be produced.
+	// - Unlike ExecutorService, this pool is assembled directly from goroutines and channels;
+	//   the bounded number of workers provides back-pressure on task execution.
 	fmt.Println("6. Worker Pool (fan-out):")
 	jobs := make(chan int, 5)
 	results := make(chan int, 5)

@@ -1,11 +1,13 @@
 // Package web showcases Go's built-in net/http package for building web servers.
 //
 // For a Java developer:
-// - Go's `net/http` package is similar to the Java Servlet API or Spring MVC.
-// - `http.Handler` is like a `Servlet`. It has a `ServeHTTP` method.
-// - Middleware in Go is a common pattern, similar to `Filter` in Java.
-// - JSON marshaling is built-in with `encoding/json` (similar to Jackson/Gson).
-// - There's no separate Tomcat/Jetty server; the binary IS the server.
+//   - Go's `net/http` package is similar to the Java Servlet API or Spring MVC.
+//   - `http.Handler` is like a `Servlet`. It has a `ServeHTTP` method.
+//   - Middleware in Go is a common pattern, similar to `Filter` in Java.
+//   - JSON marshaling is built-in with `encoding/json` (similar to Jackson/Gson).
+//   - There's no separate Tomcat/Jetty server; the binary IS the server.
+//   - The standard server handles concurrent requests; handlers should not assume
+//     they run one at a time, just as servlet code must be safe under concurrency.
 package web
 
 import (
@@ -294,14 +296,18 @@ func NewWebServerHandler() http.Handler {
 // StartWebServer starts a simple HTTP server on the given port.
 //
 // For a Java developer:
-// - No Tomcat or Jetty needed. `http.ListenAndServe` is the production-ready server.
+//   - No Tomcat or Jetty is needed: `http.ListenAndServe` starts the server in this
+//     process. This deliberately small training demo omits production server timeouts
+//     and graceful shutdown; see README guidance before adapting it for deployment.
 func StartWebServer(port string) {
 	fmt.Printf("--- Web Server Demo (starting on :%s) ---\n", port)
 	fmt.Printf("   Visit http://localhost:%s/hello or http://localhost:%s/tasks\n", port, port)
 
 	handler := NewWebServerHandler()
 
-	// Use a goroutine to start the server so it doesn't block the main thread forever in a demo.
+	// Like submitting a long-lived task to an ExecutorService, this goroutine runs
+	// the blocking server loop while the demo continues. Unlike a Java thread,
+	// a goroutine is runtime-scheduled; it still needs an explicit shutdown plan.
 	go func() {
 		if err := http.ListenAndServe(":"+port, handler); err != nil {
 			fmt.Printf("Web server stopped: %v\n", err)

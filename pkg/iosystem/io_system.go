@@ -29,6 +29,8 @@ import (
 //   - The `net` package provides low-level networking (like `java.net.Socket`).
 //   - `os/exec` is equivalent to `ProcessBuilder` for running external commands.
 //   - `os/signal` is equivalent to `Runtime.addShutdownHook()`.
+//   - Streaming with `bufio.Scanner` or `bufio.Reader` is useful for agents that
+//     process logs or telemetry incrementally instead of reading whole files at once.
 func RunIOSystemDemo() {
 	fmt.Println("--- I/O and System-Level Programming Demo ---")
 
@@ -64,6 +66,9 @@ func RunIOSystemDemo() {
 
 	// Buffered Reading (Line by Line)
 	// Java comparison: `BufferedReader.readLine()`.
+	// Like Java's BufferedReader, this processes one line at a time rather than
+	// retaining the whole file. Scanner has a default maximum token size; raise it
+	// with Buffer when input records may be larger than the default.
 	fmt.Println("\n   Buffered reading (Line by Line):")
 	f, _ = os.Open(tempFile)
 	scanner := bufio.NewScanner(f)

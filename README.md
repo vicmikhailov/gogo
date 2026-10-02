@@ -50,6 +50,19 @@ The Makefile also provides `build`, `test`, `fmt`, `vet`, and `clean`. `make run
 
 Go slices, maps, and channels are passed by value, but copying their descriptors does not deep-copy the data they refer to. A slice append may allocate a new backing array, so a function that appends should return the resulting slice. Maps share entries across copied map values. These semantics do not make concurrent access safe.
 
+## Where Go is especially effective
+
+No language is the absolute best for every workload. Go is a particularly strong choice when a system needs a compiled executable, practical concurrency, and a relatively small operational footprint without depending on a large application framework. The examples below demonstrate the relevant building blocks; they are training demos, not drop-in production services.
+
+| Use case | Why Go fits | Real-world example | Training demo |
+|---|---|---|---|
+| Concurrent HTTP services and gateways | `net/http` provides a server, client, TLS support, and handler interfaces in the standard library. The server handles requests concurrently; goroutines are useful for additional concurrent work. | [Caddy](https://github.com/caddyserver/caddy), an extensible server platform with automatic HTTPS. | [`pkg/web`](pkg/web/web.go): handlers, middleware, JSON, and request-context cancellation. |
+| Cloud control planes and infrastructure tools | Goroutines, channels, contexts, and bounded worker pools make parallel API operations and cancellation explicit. These are useful primitives for reconcilers and resource graphs. | [Kubernetes](https://github.com/kubernetes/kubernetes) and [Terraform](https://github.com/hashicorp/terraform). | [`pkg/concurrency`](pkg/concurrency/concurrency.go) and [`pkg/advanced`](pkg/advanced/advanced.go): worker pools, pipelines, cancellation, and bounded fan-out. |
+| CLI and developer tools | The standard library covers flags, files, processes, signals, and networking; compilation produces an executable users can run without installing a language runtime. | Terraform's core CLI is written in Go. | [`pkg/iosystem`](pkg/iosystem/io_system.go): flags, file I/O, subprocesses, networking, and signals. |
+| Streaming agents and telemetry processing | Buffered readers and incremental decoding can process records without loading an entire input into memory. A compiled executable is also convenient to deploy as an agent. | [Prometheus](https://github.com/prometheus/prometheus), a monitoring and metrics system. | [`pkg/iosystem`](pkg/iosystem/io_system.go): buffered line-by-line file reading; [`pkg/advanced`](pkg/advanced/advanced.go): concurrent fan-out. |
+
+For Java developers, these are not claims that Go always beats the JVM on throughput or memory use. Java may be preferable when its mature frameworks, libraries, or JIT behavior are central to the workload; Python is often a better fit for data-science workflows, and Node.js can be a natural choice for a JavaScript-centered stack. Benchmark the actual workload and compare the whole operational model, not just language-level features.
+
 ## Patterns worth carrying over—and those to reconsider
 
 Idiomatic patterns shown in the code include narrow consumer-side interfaces, explicit error wrapping, functional options for extensible configuration, composition through embedding, `sync.Once` for one-time initialization, and context-aware pipelines. A GoF pattern is still a tool, not a goal: prefer the simplest code that makes the contract clear.
